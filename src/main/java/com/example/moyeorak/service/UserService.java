@@ -13,6 +13,7 @@ import com.example.moyeorak.dto.UserResponseDto;
 import com.example.moyeorak.dto.UserUpdateRequestDto;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.moyeorak.dto.UserPasswordChangeRequestDto;
+import com.example.moyeorak.dto.UserDeleteRequestDto;
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -109,5 +110,17 @@ public class UserService {
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         userRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(String email, UserDeleteRequestDto dto) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+        }
+
+        userRepository.delete(user);
     }
 }

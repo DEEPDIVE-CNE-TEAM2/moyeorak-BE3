@@ -14,6 +14,7 @@ import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.dto.UserResponseDto;
 import com.example.moyeorak.dto.UserUpdateRequestDto;
 import com.example.moyeorak.dto.UserPasswordChangeRequestDto;
+import com.example.moyeorak.dto.UserDeleteRequestDto;
 import java.util.Map;
 
 @RestController
@@ -76,5 +77,15 @@ public class UserController {
 
         userService.changePassword(email, dto);
         return ResponseEntity.ok().body(Map.of("message", "비밀번호가 성공적으로 변경되었습니다."));
+    }
+
+    @DeleteMapping
+    public ResponseEntity<?> deleteUser(@RequestHeader("Authorization") String authHeader,
+                                        @RequestBody UserDeleteRequestDto dto) {
+        String jwt = authHeader.replace("Bearer ", "");
+        String email = jwtProvider.getEmail(jwt);
+
+        userService.deleteUser(email, dto);
+        return ResponseEntity.ok().body(Map.of("message", "회원 탈퇴가 성공적으로 처리되었습니다."));
     }
 }
