@@ -16,6 +16,7 @@ import com.example.moyeorak.dto.UserUpdateRequestDto;
 import com.example.moyeorak.dto.UserPasswordChangeRequestDto;
 import com.example.moyeorak.dto.UserDeleteRequestDto;
 import java.util.Map;
+import com.example.moyeorak.entity.User;
 
 @RestController
 @RequestMapping("/api/users")
@@ -33,8 +34,8 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody UserLoginRequestDto dto) {
-        String token = userService.login(dto);
-        return ResponseEntity.ok(new LoginResponseDto("로그인 완료", "Bearer " + token));
+        LoginResponseDto response = userService.login(dto);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/me")
@@ -88,4 +89,37 @@ public class UserController {
         userService.deleteUser(email, dto);
         return ResponseEntity.ok().body(Map.of("message", "회원 탈퇴가 성공적으로 처리되었습니다."));
     }
+
+    @GetMapping("/check-email")
+    public ResponseEntity<?> checkEmailDuplicate(@RequestParam String email) {
+        boolean exists = userService.isEmailDuplicate(email);
+        return ResponseEntity.ok().body(Map.of("isDuplicate", exists));
+    }
+
+    @GetMapping("/check-phone")
+    public ResponseEntity<?> checkPhoneDuplicate(@RequestParam String phone) {
+        boolean exists = userService.isPhoneDuplicate(phone);
+        return ResponseEntity.ok().body(Map.of("isDuplicate", exists));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> tokenMap) {
+        String refreshToken = tokenMap.get("refreshToken");
+
+        if (!jwtProvider.validateToken(refreshToken)) {
+            return ResponseEntity.status(401).body("Refresh Token이 유효하지 않습니다.");
+        }
+
+        String email = jwtProvider.getEmail(refreshToken);
+
+        User user = userService.getUserByEmail(email);
+
+        if (!refreshToken.equals(user.getRefreshToken())) {
+            return ResponseEntity.status(401).body("Refresh Token이 일치하지 않습니다.");
+        }
+
+        String newAccessToken = jwtProvider.generateToken(email);
+        return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
+    }
+
 }

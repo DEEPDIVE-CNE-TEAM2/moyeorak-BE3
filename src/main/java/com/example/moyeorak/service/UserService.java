@@ -14,6 +14,9 @@ import com.example.moyeorak.dto.UserUpdateRequestDto;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.moyeorak.dto.UserPasswordChangeRequestDto;
 import com.example.moyeorak.dto.UserDeleteRequestDto;
+import com.example.moyeorak.dto.LoginResponseDto;
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -54,7 +57,7 @@ public class UserService {
                 .build();
     }
 
-    public String login(UserLoginRequestDto dto) {
+    public LoginResponseDto login(UserLoginRequestDto dto) {
         User user = userRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이메일입니다."));
 
@@ -62,7 +65,14 @@ public class UserService {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
-        return jwtProvider.generateToken(user.getEmail());
+        String accessToken = jwtProvider.generateToken(user.getEmail());
+        String refreshToken = jwtProvider.generateRefreshToken(user.getEmail());
+
+        // refreshToken 저장
+        user.setRefreshToken(refreshToken);
+        userRepository.save(user);
+
+        return new LoginResponseDto("로그인 완료", "Bearer " + accessToken, refreshToken);
     }
 
     public UserResponseDto getMyInfo(String email) {
@@ -123,4 +133,18 @@ public class UserService {
 
         userRepository.delete(user);
     }
+
+    public boolean isEmailDuplicate(String email) {
+        return userRepository.findByEmail(email).isPresent();
+    }
+
+    public boolean isPhoneDuplicate(String phone) {
+        return userRepository.findByPhone(phone).isPresent();
+    }
+
+    public User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+    }
+
 }

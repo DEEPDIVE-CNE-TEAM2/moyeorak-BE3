@@ -57,4 +57,7 @@ public class User {
     public enum Role {
         user, admin
     }
+
+    @Column(name = "refresh_token")
+    private String refreshToken;
 }
