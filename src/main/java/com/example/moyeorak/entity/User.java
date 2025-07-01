@@ -1,6 +1,7 @@
 package com.example.moyeorak.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Pattern;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -21,7 +22,7 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;;
 
     @Column(length = 100, nullable = false, unique = true)
     private String email;
@@ -37,6 +38,7 @@ public class User {
     private Gender gender;
 
     @Column(length = 20, nullable = false, unique = true)
+    @Pattern(regexp = "^010-\\d{4}-\\d{4}$", message = "전화번호는 010-XXXX-XXXX 형식이어야 합니다.")
     private String phone;
 
     @Enumerated(EnumType.STRING)

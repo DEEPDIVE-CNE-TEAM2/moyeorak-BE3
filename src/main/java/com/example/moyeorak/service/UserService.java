@@ -84,6 +84,7 @@ public class UserService {
     @Transactional
     public UserResponseDto updateUserInfo(String emailFromToken, UserUpdateRequestDto dto) {
         System.out.println("🔧 [UserService] 사용자 정보 수정 요청 받음");
+
         User user = userRepository.findByEmail(emailFromToken)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
@@ -103,6 +104,11 @@ public class UserService {
 
         if (dto.getAddress() != null) {
             user.setAddress(dto.getAddress());
+        }
+
+        // 🔧 이름 수정 로직 추가
+        if (dto.getName() != null) {
+            user.setName(dto.getName());
         }
 
         userRepository.save(user);
