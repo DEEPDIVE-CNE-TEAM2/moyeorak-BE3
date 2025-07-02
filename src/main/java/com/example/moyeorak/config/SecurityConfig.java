@@ -21,7 +21,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll() // 헬스체크 페이지 누구나 접근 가능
+                        .requestMatchers("/actuator/health", "/actuator/info", "/health").permitAll() // 헬스체크 페이지 누구나 접근 가능
                         .requestMatchers("/api/users/signup", "/api/users/login", "/error").permitAll()  // 회원가입, 로그인, 에러 페이지는 누구나 접근 가능
                         .requestMatchers("/api/users/delete", "/api/users/check-email", "/api/users/check-phone").permitAll()  // 회원 탈퇴는 누구나 접근 가능
                         .requestMatchers("/api/rentals", "/api/rentals/{id}").permitAll()
