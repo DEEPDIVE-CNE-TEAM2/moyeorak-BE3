@@ -1,22 +1,21 @@
 package com.example.moyeorak.service;
 
-import com.example.moyeorak.dto.UserSignupRequestDto;
-import com.example.moyeorak.dto.UserSignupResponseDto;
+import com.example.moyeorak.dto.*;
 import com.example.moyeorak.entity.User;
 import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import com.example.moyeorak.dto.UserLoginRequestDto;
-import com.example.moyeorak.dto.UserResponseDto;
-import com.example.moyeorak.dto.UserUpdateRequestDto;
-import org.springframework.transaction.annotation.Transactional;
-import com.example.moyeorak.dto.UserPasswordChangeRequestDto;
-import com.example.moyeorak.dto.UserDeleteRequestDto;
-import com.example.moyeorak.dto.LoginResponseDto;
-import java.util.Optional;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.function.Consumer;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -26,29 +25,25 @@ public class UserService {
     private final JwtProvider jwtProvider;
 
     public UserSignupResponseDto signup(UserSignupRequestDto dto) {
-        // 중복 확인
-        if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("이미 존재하는 이메일입니다.");
-        }
+        String email = dto.getEmail().trim().toLowerCase();
+        String phone = dto.getPhone().trim();
 
-        if (userRepository.findByPhone(dto.getPhone()).isPresent()) {
-            throw new IllegalArgumentException("이미 존재하는 전화번호입니다.");
-        }
+        validateDuplicateEmail(email);
+        validateDuplicatePhone(phone);
 
-        // 비밀번호 암호화 및 사용자 저장
         User user = User.builder()
-                .email(dto.getEmail())
+                .email(email)
                 .password(passwordEncoder.encode(dto.getPassword()))
                 .name(dto.getName())
                 .gender(dto.getGender())
-                .phone(dto.getPhone())
-                .role(dto.getRole())  // 역할 설정
+                .phone(phone)
+                .role(dto.getRole())
                 .address(dto.getAddress())
+                .birth(LocalDate.parse(dto.getBirth()))
                 .build();
 
         User savedUser = userRepository.save(user);
 
-        // 응답 DTO 생성 후 반환
         return UserSignupResponseDto.builder()
                 .email(savedUser.getEmail())
                 .name(savedUser.getName())
@@ -65,12 +60,10 @@ public class UserService {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
-        String accessToken = jwtProvider.generateToken(user.getEmail());
+        String accessToken = jwtProvider.generateToken(user.getEmail(), user.getRole().name());
         String refreshToken = jwtProvider.generateRefreshToken(user.getEmail());
 
-        // refreshToken 저장
         user.setRefreshToken(refreshToken);
-        userRepository.save(user);
 
         return new LoginResponseDto("로그인 완료", "Bearer " + accessToken, refreshToken);
     }
@@ -83,35 +76,24 @@ public class UserService {
 
     @Transactional
     public UserResponseDto updateUserInfo(String emailFromToken, UserUpdateRequestDto dto) {
-        System.out.println("🔧 [UserService] 사용자 정보 수정 요청 받음");
+        log.info("[UserService] 사용자 정보 수정 요청: {}", emailFromToken);
 
         User user = userRepository.findByEmail(emailFromToken)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        if (dto.getEmail() != null && !dto.getEmail().equals(user.getEmail())) {
-            if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
-                throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
-            }
-            user.setEmail(dto.getEmail());
-        }
+        updateIfChanged(dto.getEmail(), user.getEmail(), newEmail -> {
+            validateDuplicateEmail(newEmail);
+            user.setEmail(newEmail.trim().toLowerCase());
+        });
 
-        if (dto.getPhone() != null && !dto.getPhone().equals(user.getPhone())) {
-            if (userRepository.findByPhone(dto.getPhone()).isPresent()) {
-                throw new IllegalArgumentException("이미 사용 중인 전화번호입니다.");
-            }
-            user.setPhone(dto.getPhone());
-        }
+        updateIfChanged(dto.getPhone(), user.getPhone(), newPhone -> {
+            validateDuplicatePhone(newPhone);
+            user.setPhone(newPhone.trim());
+        });
 
-        if (dto.getAddress() != null) {
-            user.setAddress(dto.getAddress());
-        }
+        updateIfChanged(dto.getAddress(), user.getAddress(), user::setAddress);
+        updateIfChanged(dto.getName(), user.getName(), user::setName);
 
-        // 🔧 이름 수정 로직 추가
-        if (dto.getName() != null) {
-            user.setName(dto.getName());
-        }
-
-        userRepository.save(user);
         return UserResponseDto.fromEntity(user);
     }
 
@@ -125,7 +107,6 @@ public class UserService {
         }
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
-        userRepository.save(user);
     }
 
     @Transactional
@@ -133,7 +114,6 @@ public class UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        // 비밀번호가 일치하는지 확인
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
@@ -142,15 +122,39 @@ public class UserService {
     }
 
     public boolean isEmailDuplicate(String email) {
-        return userRepository.findByEmail(email).isPresent();
+        return userRepository.findByEmail(email.trim().toLowerCase()).isPresent();
     }
 
     public boolean isPhoneDuplicate(String phone) {
-        return userRepository.findByPhone(phone).isPresent();
+        return userRepository.findByPhone(phone.trim()).isPresent();
     }
 
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+    }
+
+    public List<UserResponseDto> getAllUsers() {
+        return userRepository.findAll(Sort.by("id").descending()).stream()
+                .map(UserResponseDto::fromEntity)
+                .toList();
+    }
+
+    private void validateDuplicateEmail(String email) {
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new IllegalArgumentException("이미 존재하는 이메일입니다.");
+        }
+    }
+
+    private void validateDuplicatePhone(String phone) {
+        if (userRepository.findByPhone(phone).isPresent()) {
+            throw new IllegalArgumentException("이미 존재하는 전화번호입니다.");
+        }
+    }
+
+    private void updateIfChanged(String newValue, String currentValue, Consumer<String> updater) {
+        if (newValue != null && !newValue.equals(currentValue)) {
+            updater.accept(newValue);
+        }
     }
 }

@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Getter
@@ -20,16 +20,15 @@ public class RentalApplication {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // EAGER 로딩으로 설정하여 관계된 데이터를 즉시 로딩
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rental_id", nullable = false)
     private Rental rental;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "region_id", nullable = false)
     private Region region;
 
@@ -42,8 +41,9 @@ public class RentalApplication {
     @Column(name = "requested_end_time", nullable = false)
     private LocalTime requestedEndTime;
 
-    @Column(nullable = false)
-    private String status;  // approved, cancelled 등
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RentalApplicationStatus status;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String note;
@@ -51,11 +51,18 @@ public class RentalApplication {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
     @PrePersist
-    public void prePersist() {
+    public void onCreate() {
         this.createdAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = "approved";  // 기본 상태
-        }
+        this.updatedAt = this.createdAt;
+        if (this.status == null) this.status = RentalApplicationStatus.PENDING;
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }

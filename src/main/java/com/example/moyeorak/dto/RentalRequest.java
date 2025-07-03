@@ -63,4 +63,8 @@ public class RentalRequest {
     @NotBlank
     @Size(max = 50)
     private String contact;
+
+    @NotBlank
+    @Size(max = 255)
+    private String address;
 }

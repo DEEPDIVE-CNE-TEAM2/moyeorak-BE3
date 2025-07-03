@@ -28,4 +28,5 @@ public class RentalResponse {
     private Integer fee;
     private Integer capacity;
     private String contact;
+    private String address;
 }

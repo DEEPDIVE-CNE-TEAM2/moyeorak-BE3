@@ -1,7 +1,13 @@
 package com.example.moyeorak.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.sql.Timestamp;
 
 @Entity
 @Table(name = "regions")
@@ -16,11 +22,20 @@ public class Region {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(length = 50, nullable = false, unique = true)
+    @NotBlank
+    @Pattern(regexp = "^[가-힣\\s]+구$", message = "지역명은 'oo구' 또는 'oo시 oo구' 형식이어야 합니다.")
+    @Column(length = 100, nullable = false, unique = true)
     private String name;
 
-    // manager_id: 외래키. User 엔티티가 있다고 가정
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id", foreignKey = @ForeignKey(name = "fk_manager"))
     private User manager;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private Timestamp createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private Timestamp updatedAt;
 }

@@ -35,4 +35,8 @@ public class UserSignupRequestDto {
     @NotBlank
     @Pattern(regexp = "^[가-힣]{2,}시\\s[가-힣]{2,}구$", message = "주소는 'OO시 OO구' 형식이어야 합니다.")
     private String address;
+
+    @NotBlank
+    @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "생년월일은 yyyy-MM-dd 형식이어야 합니다.")
+    private String birth;
 }

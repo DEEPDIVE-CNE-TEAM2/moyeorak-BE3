@@ -1,23 +1,18 @@
 package com.example.moyeorak.controller;
 
-import com.example.moyeorak.dto.UserSignupRequestDto;
-import com.example.moyeorak.dto.UserSignupResponseDto;
+import com.example.moyeorak.dto.*;
+import com.example.moyeorak.entity.User;
+import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import com.example.moyeorak.dto.UserLoginRequestDto;
-import com.example.moyeorak.dto.LoginResponseDto;
-import jakarta.servlet.http.HttpServletRequest;
-import com.example.moyeorak.jwt.JwtProvider;
-import com.example.moyeorak.dto.UserResponseDto;
-import com.example.moyeorak.dto.UserUpdateRequestDto;
-import com.example.moyeorak.dto.UserPasswordChangeRequestDto;
-import com.example.moyeorak.dto.UserDeleteRequestDto;
+
+import java.util.List;
 import java.util.Map;
-import com.example.moyeorak.entity.User;
 
 @RestController
 @RequestMapping("/api/users")
@@ -27,6 +22,15 @@ public class UserController {
     private final UserService userService;
     private final JwtProvider jwtProvider;
 
+    private String extractEmailFromRequest(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("유효하지 않은 토큰입니다.");
+        }
+        String jwt = token.substring(7).trim();
+        return jwtProvider.getEmail(jwt);
+    }
+
     @PostMapping("/signup")
     public ResponseEntity<UserSignupResponseDto> signup(@Valid @RequestBody UserSignupRequestDto dto) {
         UserSignupResponseDto response = userService.signup(dto);
@@ -34,72 +38,55 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody UserLoginRequestDto dto) {
+    public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody UserLoginRequestDto dto) {
         LoginResponseDto response = userService.login(dto);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getMyInfo(HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-
-        if (token == null || !token.startsWith("Bearer ")) {
-            return ResponseEntity.status(401).body("토큰이 없습니다.");
-        }
-
-        String jwt = token.substring(7); // "Bearer " 제거
-        String email = jwtProvider.getEmail(jwt);
-
+    public ResponseEntity<UserResponseDto> getMyInfo(HttpServletRequest request) {
+        String email = extractEmailFromRequest(request);
         UserResponseDto responseDto = userService.getMyInfo(email);
         return ResponseEntity.ok(responseDto);
     }
 
     @PutMapping("/me")
-    public ResponseEntity<?> updateMyInfo(@RequestBody UserUpdateRequestDto dto, HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-
-        if (token == null || !token.startsWith("Bearer ")) {
-            return ResponseEntity.status(401).body("토큰이 없습니다.");
-        }
-
-        String jwt = token.substring(7).trim();
-        String email = jwtProvider.getEmail(jwt);
-
+    public ResponseEntity<UserResponseDto> updateMyInfo(
+            @Valid @RequestBody UserUpdateRequestDto dto,
+            HttpServletRequest request) {
+        String email = extractEmailFromRequest(request);
         UserResponseDto updatedUser = userService.updateUserInfo(email, dto);
         return ResponseEntity.ok(updatedUser);
     }
 
     @PutMapping("/password")
-    public ResponseEntity<?> changePassword(@RequestHeader("Authorization") String authHeader,
-                                            @RequestBody UserPasswordChangeRequestDto dto) {
-        String jwt = authHeader.replace("Bearer ", "");
-        String email = jwtProvider.getEmail(jwt);
-
+    public ResponseEntity<Map<String, String>> changePassword(
+            HttpServletRequest request,
+            @Valid @RequestBody UserPasswordChangeRequestDto dto) {
+        String email = extractEmailFromRequest(request);
         userService.changePassword(email, dto);
-        return ResponseEntity.ok().body(Map.of("message", "비밀번호가 성공적으로 변경되었습니다."));
+        return ResponseEntity.ok(Map.of("message", "비밀번호가 성공적으로 변경되었습니다."));
     }
 
     @DeleteMapping("/delete")
-    public ResponseEntity<?> deleteUser(@RequestHeader("Authorization") String authHeader,
-                                        @RequestBody UserDeleteRequestDto dto) {
-        String jwt = authHeader.replace("Bearer ", "");
-        String email = jwtProvider.getEmail(jwt);
-
+    public ResponseEntity<Map<String, String>> deleteUser(
+            HttpServletRequest request,
+            @Valid @RequestBody UserDeleteRequestDto dto) {
+        String email = extractEmailFromRequest(request);
         userService.deleteUser(email, dto);
-
-        return ResponseEntity.ok().body(Map.of("message", "회원 탈퇴가 성공적으로 처리되었습니다."));
+        return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 성공적으로 처리되었습니다."));
     }
 
     @GetMapping("/check-email")
-    public ResponseEntity<?> checkEmailDuplicate(@RequestParam String email) {
-        boolean exists = userService.isEmailDuplicate(email);
-        return ResponseEntity.ok().body(Map.of("isDuplicate", exists));
+    public ResponseEntity<Map<String, Boolean>> checkEmailDuplicate(@RequestParam String email) {
+        boolean isDuplicate = userService.isEmailDuplicate(email.trim().toLowerCase());
+        return ResponseEntity.ok(Map.of("isDuplicate", isDuplicate));
     }
 
     @GetMapping("/check-phone")
-    public ResponseEntity<?> checkPhoneDuplicate(@RequestParam String phone) {
-        boolean exists = userService.isPhoneDuplicate(phone);
-        return ResponseEntity.ok().body(Map.of("isDuplicate", exists));
+    public ResponseEntity<Map<String, Boolean>> checkPhoneDuplicate(@RequestParam String phone) {
+        boolean isDuplicate = userService.isPhoneDuplicate(phone.trim());
+        return ResponseEntity.ok(Map.of("isDuplicate", isDuplicate));
     }
 
     @PostMapping("/refresh")
@@ -107,18 +94,24 @@ public class UserController {
         String refreshToken = tokenMap.get("refreshToken");
 
         if (!jwtProvider.validateToken(refreshToken)) {
-            return ResponseEntity.status(401).body("Refresh Token이 유효하지 않습니다.");
+            return ResponseEntity.status(401).body(Map.of("message", "Refresh Token이 유효하지 않습니다."));
         }
 
         String email = jwtProvider.getEmail(refreshToken);
-
         User user = userService.getUserByEmail(email);
 
         if (!refreshToken.equals(user.getRefreshToken())) {
-            return ResponseEntity.status(401).body("Refresh Token이 일치하지 않습니다.");
+            return ResponseEntity.status(401).body(Map.of("message", "Refresh Token이 일치하지 않습니다."));
         }
 
-        String newAccessToken = jwtProvider.generateToken(email);
+        String newAccessToken = jwtProvider.generateToken(email, user.getRole().name());
         return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
+    }
+
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserResponseDto>> getAllUsers() {
+        List<UserResponseDto> users = userService.getAllUsers();
+        return ResponseEntity.ok(users);
     }
 }

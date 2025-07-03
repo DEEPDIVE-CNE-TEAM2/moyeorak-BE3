@@ -9,6 +9,6 @@ import lombok.*;
 public class RegionRequest {
     @NotBlank
     private String name;
-
     private Long  managerId;
+
 }

@@ -7,7 +7,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Entity
-@Getter @Setter
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -16,7 +17,7 @@ public class Rental {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;  // Integer → Long 으로 수정
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "region_id", nullable = false)
@@ -28,10 +29,11 @@ public class Rental {
     @Column(length = 255, nullable = false)
     private String location;
 
-    @Column(length = 255)
+    @Column(length = 255, nullable = false)
     private String imageUrl;
 
     @Lob
+    @Column(nullable = false)
     private String description;
 
     @Column(length = 50, nullable = false)
@@ -66,5 +68,7 @@ public class Rental {
 
     @Column(length = 50, nullable = false)
     private String contact;
-}
 
+    @Column(length = 255, nullable = false)
+    private String address;
+}

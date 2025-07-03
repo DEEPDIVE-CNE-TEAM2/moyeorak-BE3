@@ -18,20 +18,25 @@ public class JwtProvider {
         this.secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
     }
 
-    public String generateToken(String email) {
+    // ✅ Access Token 발급 - 역할 포함
+    public String generateToken(String email, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + 1000L * 60 * 60); // 1시간
+
         return Jwts.builder()
                 .setSubject(email)
+                .claim("roles", role)  // roles 클레임 추가
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
+    // ✅ Refresh Token 발급 - 역할 없음
     public String generateRefreshToken(String email) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + 1000L * 60 * 60 * 24 * 7); // 7일
+
         return Jwts.builder()
                 .setSubject(email)
                 .setIssuedAt(now)
@@ -40,6 +45,7 @@ public class JwtProvider {
                 .compact();
     }
 
+    // ✅ 이메일 추출
     public String getEmail(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(secretKey)
@@ -49,6 +55,7 @@ public class JwtProvider {
                 .getSubject();
     }
 
+    // ✅ 토큰 유효성 검증
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token);
@@ -56,17 +63,5 @@ public class JwtProvider {
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
-    }
-
-    public String generateToken(String email, String role) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + 1000L * 60 * 60); // 1시간
-        return Jwts.builder()
-                .setSubject(email)
-                .claim("roles", role)  // 사용자 역할 추가
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(secretKey, SignatureAlgorithm.HS256)
-                .compact();
     }
 }

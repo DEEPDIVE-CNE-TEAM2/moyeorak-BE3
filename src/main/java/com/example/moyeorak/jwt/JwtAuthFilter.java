@@ -8,22 +8,22 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
-public class JwtAuthFilter extends GenericFilter {
+public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
     private final UserRepository userRepository;
 
     @Override
-    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
-            throws IOException, ServletException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
 
-        HttpServletRequest request = (HttpServletRequest) req;
         String header = request.getHeader("Authorization");
 
         if (header != null && header.startsWith("Bearer ")) {
@@ -33,18 +33,21 @@ public class JwtAuthFilter extends GenericFilter {
                 String email = jwtProvider.getEmail(token);
                 var user = userRepository.findByEmail(email).orElse(null);
 
-                if (user != null) {
-                    // ROLE_ 접두사 추가
+                if (user != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    var authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name().toUpperCase());
+
                     var auth = new UsernamePasswordAuthenticationToken(
-                            user,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name().toUpperCase()))  // ROLE_ 접두사 추가
+                            user, null, List.of(authority)
                     );
+
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
+            } else {
+                // 개발 시 추적용 로그 (배포 시 삭제 가능)
+                System.out.println("Invalid JWT token received");
             }
         }
 
-        chain.doFilter(req, res);
+        filterChain.doFilter(request, response);
     }
 }
