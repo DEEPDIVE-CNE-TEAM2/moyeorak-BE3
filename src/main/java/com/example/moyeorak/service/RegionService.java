@@ -60,6 +60,12 @@ public class RegionService {
         Region region = regionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + id + ")이 존재하지 않습니다."));
 
+        // 수정하려는 이름이 기존 이름과 다르고, 이미 존재하는 경우 예외
+        if (!region.getName().equals(request.getName()) &&
+                regionRepository.existsByName(request.getName())) {
+            throw new IllegalArgumentException("이미 존재하는 지역명입니다.");
+        }
+
         region.setName(request.getName());
         region.setManager(findManagerById(request.getManagerId()));
 
@@ -83,7 +89,7 @@ public class RegionService {
         return RegionResponse.builder()
                 .id(region.getId())
                 .name(region.getName())
-                .managerId(Math.toIntExact(managerId))
+                .managerId((long) Math.toIntExact(managerId))
                 .build();
     }
 

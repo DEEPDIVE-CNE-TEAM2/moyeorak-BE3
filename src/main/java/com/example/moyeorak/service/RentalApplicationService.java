@@ -20,9 +20,6 @@ public class RentalApplicationService {
     private final RentalRepository rentalRepository;
     private final RegionRepository regionRepository;
 
-    /**
-     * 대관 신청 생성
-     */
     public RentalApplicationResponse createRentalApplication(RentalApplicationRequest request) {
         log.info("[CREATE] 대관 신청 요청: {}", request);
 

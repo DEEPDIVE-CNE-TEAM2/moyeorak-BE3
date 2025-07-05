@@ -11,7 +11,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @RequiredArgsConstructor
-@EnableMethodSecurity(prePostEnabled = true) // 최신 방식
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
@@ -21,10 +21,15 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health", "/actuator/info", "/health").permitAll()
-                        .requestMatchers("/api/users/signup", "/api/users/login", "/api/users/check-email", "/api/users/check-phone").permitAll()
-                        .requestMatchers("/api/regions/**").permitAll()
-                        .requestMatchers("/api/rentals", "/api/rentals/{id}").permitAll()
+                        .requestMatchers(
+                                "/actuator/health", "/actuator/info", "/health",
+                                "/api/users/signup", "/api/users/login", "/api/users/check-email", "/api/users/check-phone",
+                                "/api/regions/**",
+                                "/api/rentals", "/api/rentals/{id}",
+                                "/api/programs",              // ✅ 추가
+                                "/api/programs/{id}",          // ✅ 추가 (상세 대비)
+                                "/api/enrollments", "/api/enrollments/**"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

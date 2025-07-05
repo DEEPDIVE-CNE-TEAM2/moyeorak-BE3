@@ -9,6 +9,6 @@ import lombok.*;
 public class RegionResponse {
     private Long id;
     private String name;
-    private Integer managerId;
+    private Long managerId;
 
 }

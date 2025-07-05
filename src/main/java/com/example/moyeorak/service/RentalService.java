@@ -71,37 +71,6 @@ public class RentalService {
     }
 
     @Transactional
-    public RentalResponse updateRental(Long id, RentalRequest request) {
-        log.info("[PUT] 대관 전체 수정 요청 - ID: {}", id);
-
-        Rental rental = rentalRepository.findById(Math.toIntExact(id))
-                .orElseThrow(() -> new IllegalArgumentException("ID " + id + "에 해당하는 대관 공간을 찾을 수 없습니다."));
-
-        Region region = regionRepository.findById(request.getRegionId())
-                .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
-
-        rental.setRegion(region);
-        rental.setCategory(request.getCategory());
-        rental.setLocation(request.getLocation());
-        rental.setImageUrl(request.getImageUrl());
-        rental.setDescription(request.getDescription());
-        rental.setTarget(request.getTarget());
-        rental.setUsageStartDate(request.getUsageStartDate());
-        rental.setUsageEndDate(request.getUsageEndDate());
-        rental.setUsageStartTime(request.getUsageStartTime());
-        rental.setUsageEndTime(request.getUsageEndTime());
-        rental.setRegistrationStartDate(request.getRegistrationStartDate());
-        rental.setRegistrationEndDate(request.getRegistrationEndDate());
-        rental.setCancelEndDate(request.getCancelEndDate());
-        rental.setFee(request.getFee());
-        rental.setCapacity(request.getCapacity());
-        rental.setContact(request.getContact());
-        rental.setAddress(request.getAddress());
-
-        return mapToResponse(rental);
-    }
-
-    @Transactional
     public RentalResponse partialUpdateRental(Long id, Map<String, Object> updates) {
         log.info("[PATCH] 대관 부분 수정 요청 - ID: {}, updates: {}", id, updates);
 
