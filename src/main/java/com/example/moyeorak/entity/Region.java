@@ -1,5 +1,6 @@
 package com.example.moyeorak.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -29,6 +30,7 @@ public class Region {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id", foreignKey = @ForeignKey(name = "fk_manager"))
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"}) // LAZY 로딩 User 직렬화 오류 방지
     private User manager;
 
     @CreationTimestamp

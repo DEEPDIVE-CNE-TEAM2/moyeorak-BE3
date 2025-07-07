@@ -34,16 +34,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 var user = userRepository.findByEmail(email).orElse(null);
 
                 if (user != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    var userDetails = new com.example.moyeorak.security.CustomUserDetails(user);
                     var authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name().toUpperCase());
 
                     var auth = new UsernamePasswordAuthenticationToken(
-                            user, null, List.of(authority)
+                            userDetails, null, List.of(authority)
                     );
 
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
             } else {
-                // 개발 시 추적용 로그 (배포 시 삭제 가능)
                 System.out.println("Invalid JWT token received");
             }
         }

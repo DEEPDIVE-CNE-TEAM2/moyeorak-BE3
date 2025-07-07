@@ -1,6 +1,7 @@
 package com.example.moyeorak.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Pattern;
 import lombok.*;
@@ -10,6 +11,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"}) // 직렬화 오류 방지
 @Entity
 @Table(name = "users",
         uniqueConstraints = {
@@ -54,6 +56,10 @@ public class User {
     @Column(nullable = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate birth;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id", nullable = false)
+    private Region region; // ✅ 지역 정보 추가
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
