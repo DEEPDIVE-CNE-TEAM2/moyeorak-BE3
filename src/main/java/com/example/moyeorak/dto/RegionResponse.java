@@ -9,6 +9,16 @@ import lombok.*;
 public class RegionResponse {
     private Long id;
     private String name;
-    private Long managerId;
+    private ManagerDto manager;
 
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ManagerDto {
+        private Long id;
+        private String name;
+        private String email;
+    }
 }

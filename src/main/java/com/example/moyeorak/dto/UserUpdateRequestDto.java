@@ -1,5 +1,6 @@
 package com.example.moyeorak.dto;
 
+import com.example.moyeorak.entity.User;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -8,14 +9,16 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserUpdateRequestDto {
-
-    @Email(message = "올바른 이메일 형식이어야 합니다.")
+    @Email
     private String email;
 
-    @Pattern(regexp = "^010-\\d{4}-\\d{4}$", message = "휴대폰 번호 형식은 010-0000-0000 입니다.")
+    @Pattern(regexp = "^010-\\d{4}-\\d{4}$")
     private String phone;
 
-    private String address;
-
     private String name;
+
+    private User.Gender gender;
+
+    private String confirmPassword;
 }
+

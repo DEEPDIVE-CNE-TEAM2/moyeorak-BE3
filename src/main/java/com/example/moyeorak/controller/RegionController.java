@@ -15,45 +15,51 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/regions")
 @RequiredArgsConstructor
+@RequestMapping("/api/regions")
 public class RegionController {
 
     private final RegionService regionService;
 
+    // 📌 지역 생성 (관리자만)
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<RegionResponse> createRegion(@RequestBody @Valid RegionRequest request) {
+    public ResponseEntity<RegionResponse> createRegion(@Valid @RequestBody RegionRequest request) {
         log.info("[POST] 지역 생성 요청: {}", request);
         RegionResponse created = regionService.createRegion(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    // 📌 전체 지역 목록 조회
     @GetMapping
     public ResponseEntity<List<RegionResponse>> getAllRegions() {
         log.info("[GET] 전체 지역 목록 조회");
         return ResponseEntity.ok(regionService.getAllRegions());
     }
 
+    // 📌 특정 지역 상세 조회
     @GetMapping("/{id}")
     public ResponseEntity<RegionResponse> getRegionById(@PathVariable Long id) {
-        log.info("[GET] 지역 조회 요청 - ID: {}", id);
+        log.info("[GET] 지역 상세 조회 - ID: {}", id);
         return ResponseEntity.ok(regionService.getRegion(id));
     }
 
+    // 📌 지역 정보 수정 (관리자만)
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<RegionResponse> updateRegion(@PathVariable Long id,
-                                                       @RequestBody @Valid RegionRequest request) {
+    public ResponseEntity<RegionResponse> updateRegion(
+            @PathVariable Long id,
+            @Valid @RequestBody RegionRequest request
+    ) {
         log.info("[PUT] 지역 수정 요청 - ID: {}", id);
         return ResponseEntity.ok(regionService.updateRegion(id, request));
     }
 
+    // 📌 지역 삭제 (관리자만)
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MessageResponse> deleteRegion(@PathVariable Long id) {
         log.info("[DELETE] 지역 삭제 요청 - ID: {}", id);
-        MessageResponse response = regionService.deleteRegion(id);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(regionService.deleteRegion(id));
     }
 }

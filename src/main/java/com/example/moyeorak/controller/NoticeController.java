@@ -30,7 +30,7 @@ public class NoticeController {
     @PostMapping
     public ResponseEntity<NoticeResponse> createNotice(@RequestBody @Valid NoticeRequest request,
                                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
-        User author = userRepository.findById(Math.toIntExact(userDetails.getUserId()))
+        User author = userRepository.findById((long) Math.toIntExact(userDetails.getUserId()))
                 .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
 
         NoticeDto created = noticeService.create(author, request);

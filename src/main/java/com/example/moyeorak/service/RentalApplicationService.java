@@ -23,7 +23,7 @@ public class RentalApplicationService {
     public RentalApplicationResponse createRentalApplication(RentalApplicationRequest request) {
         log.info("[CREATE] 대관 신청 요청: {}", request);
 
-        User user = userRepository.findById(request.getUserId())
+        User user = userRepository.findById(Long.valueOf(request.getUserId()))
                 .orElseThrow(() -> new IllegalArgumentException("사용자가 존재하지 않습니다."));
         Rental rental = rentalRepository.findById(request.getRentalId())
                 .orElseThrow(() -> new IllegalArgumentException("대관 공간이 존재하지 않습니다."));

@@ -27,13 +27,11 @@ public class RegionService {
     public RegionResponse createRegion(RegionRequest request) {
         log.info("[CREATE] 지역 생성 요청: {}", request);
 
-        if (regionRepository.existsByName(request.getName())) {
-            throw new IllegalArgumentException("이미 존재하는 지역명입니다.");
-        }
+        validateRegionNameUnique(request.getName());
 
         Region region = Region.builder()
                 .name(request.getName())
-                .manager(findManagerById(request.getManagerId()))
+                .manager(resolveManager(request.getManagerId()))
                 .build();
 
         return toResponse(regionRepository.save(region));
@@ -41,6 +39,7 @@ public class RegionService {
 
     public List<RegionResponse> getAllRegions() {
         log.info("[GET] 전체 지역 목록 조회");
+
         return regionRepository.findAll().stream()
                 .map(this::toResponse)
                 .toList();
@@ -48,8 +47,8 @@ public class RegionService {
 
     public RegionResponse getRegion(Long id) {
         log.info("[GET] 지역 상세 조회 - ID: {}", id);
-        Region region = regionRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + id + ")이 존재하지 않습니다."));
+
+        Region region = findRegionById(id);
         return toResponse(region);
     }
 
@@ -57,17 +56,14 @@ public class RegionService {
     public RegionResponse updateRegion(Long id, RegionRequest request) {
         log.info("[PUT] 지역 수정 요청 - ID: {}", id);
 
-        Region region = regionRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + id + ")이 존재하지 않습니다."));
+        Region region = findRegionById(id);
 
-        // 수정하려는 이름이 기존 이름과 다르고, 이미 존재하는 경우 예외
-        if (!region.getName().equals(request.getName()) &&
-                regionRepository.existsByName(request.getName())) {
-            throw new IllegalArgumentException("이미 존재하는 지역명입니다.");
+        if (!region.getName().equals(request.getName())) {
+            validateRegionNameUnique(request.getName());
         }
 
         region.setName(request.getName());
-        region.setManager(findManagerById(request.getManagerId()));
+        region.setManager(resolveManager(request.getManagerId()));
 
         return toResponse(region);
     }
@@ -84,18 +80,46 @@ public class RegionService {
         return new MessageResponse("지역이 삭제되었습니다.");
     }
 
+
+    private Region findRegionById(Long id) {
+        return regionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + id + ")이 존재하지 않습니다."));
+    }
+
+    private void validateRegionNameUnique(String name) {
+        if (regionRepository.existsByName(name)) {
+            throw new IllegalArgumentException("이미 존재하는 지역명입니다.");
+        }
+    }
+
+    private User resolveManager(Long managerId) {
+        if (managerId == null) {
+            log.info("지역 생성/수정 시 관리자 지정 없이 요청됨");
+            return null;
+        }
+
+        return userRepository.findById(managerId)
+                .filter(user -> "ADMIN".equals(user.getRole().name()))
+                .orElseThrow(() -> new IllegalArgumentException("관리자 ID(" + managerId + ")가 없거나 ADMIN 권한이 아닙니다."));
+    }
+
     private RegionResponse toResponse(Region region) {
-        Long managerId = region.getManager() != null ? region.getManager().getId() : null;
+        RegionResponse.ManagerDto managerDto = null;
+
+        if (region.getManager() != null) {
+            User manager = region.getManager();
+            managerDto = RegionResponse.ManagerDto.builder()
+                    .id(manager.getId())
+                    .name(manager.getName())
+                    .email(manager.getEmail())
+                    .build();
+        }
+
         return RegionResponse.builder()
                 .id(region.getId())
                 .name(region.getName())
-                .managerId((long) Math.toIntExact(managerId))
+                .manager(managerDto)
                 .build();
     }
 
-    private User findManagerById(Long managerId) {
-        if (managerId == null) return null;
-        return userRepository.findById(Math.toIntExact(managerId))
-                .orElseThrow(() -> new IllegalArgumentException("관리자 ID(" + managerId + ")가 존재하지 않습니다."));
-    }
 }

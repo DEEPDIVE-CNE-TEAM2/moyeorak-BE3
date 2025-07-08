@@ -8,9 +8,11 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegionRequest {
-    @Pattern(regexp = "^[가-힣\\s]+구$", message = "지역명은 'oo구' 또는 'oo시 oo구' 형식이어야 합니다.")
-    @NotBlank
-    private String name;
-    private Long  managerId;
 
+    @Pattern(regexp = "^[가-힣\\s]+구$", message = "지역명은 'oo구' 또는 'oo시 oo구' 형식이어야 합니다.")
+    @NotBlank(message = "지역명은 필수입니다.")
+    private String name;
+
+    // nullable 허용, 따로 @NotNull 넣지 않음
+    private Long managerId;
 }

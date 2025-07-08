@@ -30,7 +30,7 @@ public class EnrollmentService {
             throw new IllegalArgumentException("이미 신청한 프로그램입니다.");
         }
 
-        User user = userRepository.findById(Math.toIntExact(userId))
+        User user = userRepository.findById((long) Math.toIntExact(userId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 존재하지 않습니다."));
 
         Program program = programRepository.findById(request.getProgramId())

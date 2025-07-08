@@ -4,6 +4,8 @@ import com.example.moyeorak.entity.User;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -11,32 +13,34 @@ import lombok.*;
 @Builder
 public class UserSignupRequestDto {
 
-    @Email(message = "유효한 이메일을 입력하세요.")
-    @NotBlank
+    @NotBlank(message = "이름은 필수입니다.")
+    private String name;
+
+    @Email(message = "올바른 이메일 형식이어야 합니다.")
+    @NotBlank(message = "이메일은 필수입니다.")
     private String email;
 
     @NotBlank(message = "비밀번호는 필수입니다.")
-    @Size(min = 8, message = "비밀번호는 최소 8자 이상이어야 합니다.")
     private String password;
 
-    @NotBlank
-    private String name;
-
-    @NotNull
-    private User.Gender gender;
+    @NotBlank(message = "비밀번호 확인은 필수입니다.")
+    private String confirmPassword;
 
     @Pattern(regexp = "^010-\\d{4}-\\d{4}$", message = "전화번호는 010-0000-0000 형식이어야 합니다.")
-    @NotBlank
     private String phone;
 
-    @NotNull
-    private User.Role role;
+    @NotNull(message = "성별은 필수입니다.")
+    private User.Gender gender;
 
-    @NotBlank
-    @Pattern(regexp = "^[가-힣]{2,}시\\s[가-힣]{2,}구$", message = "주소는 'OO시 OO구' 형식이어야 합니다.")
+    @NotNull(message = "생년월일은 필수입니다.")
+    private LocalDate birth;
+
+    @NotBlank(message = "주소는 필수입니다.")
     private String address;
 
-    @NotBlank
-    @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "생년월일은 yyyy-MM-dd 형식이어야 합니다.")
-    private String birth;
+    private User.Role role;
+
+    public User.Role getRoleOrDefault() {
+        return role != null ? role : User.Role.USER;
+    }
 }
