@@ -13,9 +13,6 @@ import java.time.LocalTime;
 @Builder
 public class RentalRequest {
 
-    @NotNull
-    private Long regionId;
-
     @NotBlank
     @Size(max = 50)
     private String category;

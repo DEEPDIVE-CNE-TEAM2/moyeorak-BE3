@@ -2,7 +2,9 @@ package com.example.moyeorak.service;
 
 import com.example.moyeorak.dto.EnrollmentRequest;
 import com.example.moyeorak.dto.EnrollmentResponse;
-import com.example.moyeorak.entity.*;
+import com.example.moyeorak.entity.Enrollment;
+import com.example.moyeorak.entity.Program;
+import com.example.moyeorak.entity.User;
 import com.example.moyeorak.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Slf4j
@@ -20,40 +23,108 @@ public class EnrollmentService {
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final ProgramRepository programRepository;
-    private final RegionRepository regionRepository;
 
+    // ✅ 수강 신청
     @Transactional
-    public EnrollmentResponse enroll(Long userId, EnrollmentRequest request) {
-        log.info("[CREATE] 수강 신청 요청: userId={}, programId={}", userId, request.getProgramId());
+    public EnrollmentResponse enrollByEmail(String email, EnrollmentRequest request) {
+        log.info("[ENROLL] 수강 신청 요청 by {}", email);
 
-        if (enrollmentRepository.existsByUserIdAndProgramId(userId, request.getProgramId())) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 없습니다."));
+
+        Program program = findProgramByRequest(request);
+
+        if (enrollmentRepository.existsByUserIdAndProgramId(user.getId(), program.getId())) {
             throw new IllegalArgumentException("이미 신청한 프로그램입니다.");
         }
-
-        User user = userRepository.findById((long) Math.toIntExact(userId))
-                .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 존재하지 않습니다."));
-
-        Program program = programRepository.findById(request.getProgramId())
-                .orElseThrow(() -> new IllegalArgumentException("프로그램 정보가 존재하지 않습니다."));
-
-        Region region = regionRepository.findById(request.getRegionId())
-                .orElseThrow(() -> new IllegalArgumentException("지역 정보가 존재하지 않습니다."));
 
         Enrollment enrollment = Enrollment.builder()
                 .user(user)
                 .program(program)
-                .region(region)
-                .paidAmount(request.getPaidAmount())
+                .region(program.getRegion())
                 .status(Enrollment.Status.ENROLLED)
+                .paidAmount(request.getPaidAmount())
                 .build();
 
         return toResponse(enrollmentRepository.save(enrollment));
     }
 
+    // ✅ 내 수강 목록 조회
     public List<EnrollmentResponse> getMyEnrollments(Long userId) {
+        log.info("[GET] 사용자 수강 목록 조회 - userId: {}", userId);
         return enrollmentRepository.findByUserId(userId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    // ✅ 전체 수강 목록 조회
+    public List<EnrollmentResponse> getAllEnrollments() {
+        log.info("[GET] 전체 수강 목록 조회");
+        return enrollmentRepository.findAll().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ✅ 특정 프로그램 수강자 조회
+    public List<EnrollmentResponse> getEnrollmentsByProgram(Long programId) {
+        log.info("[GET] 특정 프로그램 수강자 조회 - programId: {}", programId);
+        return enrollmentRepository.findAll().stream()
+                .filter(e -> e.getProgram().getId().equals(programId))
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ✅ 사용자 수강 취소
+    @Transactional
+    public void cancelEnrollmentByUser(Long id, Long userId) {
+        log.info("[CANCEL] 사용자 수강 취소 요청 - enrollmentId: {}, userId: {}", id, userId);
+
+        Enrollment enrollment = getEnrollment(id);
+
+        if (!enrollment.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("본인만 수강 신청을 취소할 수 있습니다.");
+        }
+
+        if (LocalDate.now().isAfter(enrollment.getProgram().getCancelEndDate())) {
+            throw new IllegalStateException("취소 마감일이 지나 취소할 수 없습니다.");
+        }
+
+        enrollment.setStatus(Enrollment.Status.CANCELLED);
+    }
+
+    // ✅ 관리자 수강 취소
+    @Transactional
+    public void cancelEnrollmentByAdmin(Long id, String reason) {
+        log.info("[ADMIN CANCEL] 관리자 수강 취소 요청 - id: {}, reason: {}", id, reason);
+
+        Enrollment enrollment = getEnrollment(id);
+        enrollment.setStatus(Enrollment.Status.CANCELLED);
+        enrollment.setCancelReason(reason);
+    }
+
+    // ========== 내부 메서드 ==========
+
+    private Enrollment getEnrollment(Long id) {
+        return enrollmentRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("수강 신청이 존재하지 않습니다."));
+    }
+
+    private Program findProgramByRequest(EnrollmentRequest request) {
+        return programRepository.findAll().stream()
+                .filter(p -> p.getTitle().equals(request.getProgramTitle()))
+                .filter(p -> p.getFacility().getLocation().equals(request.getCenter()))
+                .filter(p -> formatDateRange(p.getUsageStartDate(), p.getUsageEndDate()).equals(request.getUsagePeriod()))
+                .filter(p -> formatTimeRange(p.getClassStartTime(), p.getClassEndTime()).equals(request.getUsageTime()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("일치하는 프로그램을 찾을 수 없습니다."));
+    }
+
+    private String formatDateRange(LocalDate start, LocalDate end) {
+        return start + " ~ " + end;
+    }
+
+    private String formatTimeRange(LocalTime start, LocalTime end) {
+        return start + " ~ " + end;
     }
 
     private EnrollmentResponse toResponse(Enrollment e) {
@@ -67,34 +138,5 @@ public class EnrollmentService {
                 .paidAmount(e.getPaidAmount())
                 .cancelReason(e.getCancelReason())
                 .build();
-    }
-
-    @Transactional
-    public void cancelEnrollmentByUser(Long id, Long userId) {
-        Enrollment enrollment = getEnrollment(id);
-
-        if (!enrollment.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("본인만 수강 신청을 취소할 수 있습니다.");
-        }
-
-        LocalDate today = LocalDate.now();
-        if (today.isAfter(enrollment.getProgram().getCancelEndDate())) {
-            throw new IllegalStateException("취소 마감일이 지나 취소할 수 없습니다.");
-        }
-
-        enrollment.setStatus(Enrollment.Status.CANCELLED);
-    }
-
-    private Enrollment getEnrollment(Long id) {
-        return enrollmentRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("수강 신청이 존재하지 않습니다."));
-    }
-
-    @Transactional
-    public void cancelEnrollmentByAdmin(Long id, String reason) {
-        Enrollment enrollment = getEnrollment(id);
-
-        enrollment.setStatus(Enrollment.Status.CANCELLED);
-        enrollment.setCancelReason(reason);
     }
 }

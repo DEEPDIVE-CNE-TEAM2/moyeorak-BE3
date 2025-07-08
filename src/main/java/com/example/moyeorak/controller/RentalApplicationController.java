@@ -1,7 +1,9 @@
 package com.example.moyeorak.controller;
 
 import com.example.moyeorak.dto.*;
+import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.service.RentalApplicationService;
+import com.example.moyeorak.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,52 +21,45 @@ import java.util.List;
 public class RentalApplicationController {
 
     private final RentalApplicationService rentalApplicationService;
+    private final JwtProvider jwtProvider;
+    private final UserService userService;
 
+    // 대관 신청 생성
     @PostMapping
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<RentalApplicationResponse> createRentalApplication(
-            @Valid @RequestBody RentalApplicationRequest request) {
-        log.info("[POST] 대관 신청 요청: {}", request);
+            @Valid @RequestBody RentalApplicationRequest request,
+            @AuthenticationPrincipal(expression = "email") String email
+    ) {
+        log.info("[POST] 대관 신청 요청 by {}", email);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(rentalApplicationService.createRentalApplication(request));
+                .body(rentalApplicationService.createRentalApplication(request, email));
     }
 
+    // 내 대관 신청 목록 조회
     @GetMapping("/me")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<List<RentalApplicationResponse>> getMyApplications(
-            @AuthenticationPrincipal(expression = "id") Long userId) {
-        log.info("[GET] 내 신청 목록 - userId: {}", userId);
-        return ResponseEntity.ok(rentalApplicationService.getUserApplications(userId));
+            @AuthenticationPrincipal(expression = "id") Long userId,
+            @AuthenticationPrincipal(expression = "email") String email
+    ) {
+        log.info("[GET] 내 신청 목록 - email: {}, userId: {}", email, userId);
+        return ResponseEntity.ok(rentalApplicationService.getApplicationsByUser(userId));
     }
 
+    // 대관 신청 취소 (사용자 본인)
     @DeleteMapping("/{applicationId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<MessageResponse> cancelRentalApplication(
             @PathVariable Long applicationId,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
+            @AuthenticationPrincipal(expression = "id") Long userId
+    ) {
         log.info("[DELETE] 신청 취소 요청 - ID: {}", applicationId);
         String result = rentalApplicationService.deleteRentalApplication(applicationId, userId);
         return ResponseEntity.ok(new MessageResponse(result));
     }
 
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<RentalApplicationResponse>> getAllApplications() {
-        return ResponseEntity.ok(rentalApplicationService.getAllApplications());
-    }
-
-    @GetMapping("/user/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<RentalApplicationResponse>> getByUser(@PathVariable Long userId) {
-        return ResponseEntity.ok(rentalApplicationService.getApplicationsByUser(userId));
-    }
-
-    @GetMapping("/rental/{rentalId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<RentalApplicationResponse>> getByRental(@PathVariable Long rentalId) {
-        return ResponseEntity.ok(rentalApplicationService.getApplicationsByRental(rentalId));
-    }
-
+    // 대관 신청 상태 변경 (ADMIN)
     @PutMapping("/{applicationId}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RentalApplicationResponse> updateStatus(
@@ -73,5 +68,13 @@ public class RentalApplicationController {
         log.info("[PUT] 상태 변경 요청 - ID: {}, status: {}", applicationId, request.getStatus());
         return ResponseEntity.ok(
                 rentalApplicationService.updateApplicationStatus(applicationId, request.getStatus()));
+    }
+
+    // 관리자 전용 전체 대관 신청 목록
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<RentalApplicationAdminResponse>> getAllForAdmin() {
+        log.info("[ADMIN] 전체 대관 신청 목록 조회");
+        return ResponseEntity.ok(rentalApplicationService.getAllApplicationsForAdmin());
     }
 }

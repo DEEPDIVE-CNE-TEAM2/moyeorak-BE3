@@ -1,14 +1,8 @@
 package com.example.moyeorak.service;
 
-import com.example.moyeorak.dto.MessageResponse;
-import com.example.moyeorak.dto.ProgramRequest;
-import com.example.moyeorak.dto.ProgramResponse;
-import com.example.moyeorak.entity.Program;
-import com.example.moyeorak.entity.Region;
-import com.example.moyeorak.entity.Rental;
-import com.example.moyeorak.repository.ProgramRepository;
-import com.example.moyeorak.repository.RegionRepository;
-import com.example.moyeorak.repository.RentalRepository;
+import com.example.moyeorak.dto.*;
+import com.example.moyeorak.entity.*;
+import com.example.moyeorak.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,9 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -32,12 +24,116 @@ public class ProgramService {
     private final RentalRepository rentalRepository;
 
     @Transactional
-    public ProgramResponse createProgram(ProgramRequest dto) {
+    public ProgramDisplayResponse createProgram(ProgramRequest dto) {
         log.info("[CREATE] 프로그램 등록 요청: {}", dto);
 
-        validateDuplicateTitle(dto.getTitle());  // 예시: 중복 검사
+        validateDuplicateTitle(dto.getTitle());
 
-        Program program = Program.builder()
+        Program program = buildProgramFromDto(dto);
+        return toDisplayResponse(programRepository.save(program));
+    }
+
+    public List<ProgramDisplayResponse> getAllPrograms() {
+        log.info("[GET] 전체 프로그램 목록 조회");
+        return programRepository.findAll().stream()
+                .map(this::toDisplayResponse)
+                .toList();
+    }
+
+    public ProgramDisplayResponse getProgramById(Long id) {
+        log.info("[GET] 프로그램 상세 조회 - ID: {}", id);
+        return toDisplayResponse(getProgram(id));
+    }
+
+    @Transactional
+    public ProgramDisplayResponse partialUpdateProgram(Long id, Map<String, Object> updates) {
+        log.info("[PATCH] 프로그램 부분 수정 - ID: {}", id);
+
+        Program program = getProgram(id);
+
+        Set<String> allowedFields = Set.of(
+                "title", "regionId", "facilityId", "category", "target", "instructorName", "status",
+                "usageStartDate", "usageEndDate", "classStartTime", "classEndTime",
+                "registrationStartDate", "registrationEndDate", "cancelEndDate",
+                "fee", "capacity", "contact", "imageUrl", "description"
+        );
+
+        updates.forEach((fieldName, value) -> {
+            if (!allowedFields.contains(fieldName)) return;
+
+            try {
+                switch (fieldName) {
+                    case "regionId" -> program.setRegion(getRegion(Long.parseLong(value.toString())));
+                    case "facilityId" -> program.setFacility(getFacility(Long.parseLong(value.toString())));
+                    case "status" ->
+                            program.setStatus("closed".equalsIgnoreCase(value.toString()) ? Program.Status.CLOSED : Program.Status.OPEN);
+                    case "usageStartDate", "usageEndDate",
+                         "registrationStartDate", "registrationEndDate", "cancelEndDate" -> {
+                        Field field = Program.class.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        field.set(program, LocalDate.parse(value.toString()));
+                    }
+                    case "classStartTime", "classEndTime" -> {
+                        Field field = Program.class.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        field.set(program, LocalTime.parse(value.toString()));
+                    }
+                    default -> {
+                        Field field = Program.class.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        Object parsed = field.getType().equals(Integer.class)
+                                ? Integer.parseInt(value.toString())
+                                : value;
+                        field.set(program, parsed);
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("필드 업데이트 실패: " + fieldName + " - " + e.getMessage(), e);
+            }
+        });
+
+        return toDisplayResponse(program);
+    }
+
+    @Transactional
+    public MessageResponse deleteProgram(Long id) {
+        log.info("[DELETE] 프로그램 삭제 - ID: {}", id);
+
+        if (!programRepository.existsById(id)) {
+            throw new IllegalArgumentException("삭제할 프로그램이 존재하지 않습니다.");
+        }
+
+        programRepository.deleteById(id);
+        return new MessageResponse("프로그램이 삭제되었습니다.");
+    }
+
+    private void validateDuplicateTitle(String title) {
+        boolean exists = programRepository.findAll().stream()
+                .anyMatch(program -> program.getTitle().equalsIgnoreCase(title));
+        if (exists) {
+            throw new IllegalArgumentException("이미 존재하는 프로그램 제목입니다.");
+        }
+    }
+
+    private Program getProgram(Long id) {
+        return programRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("프로그램(ID: " + id + ")이 존재하지 않습니다."));
+    }
+
+    private Region getRegion(Long regionId) {
+        return regionRepository.findById(regionId)
+                .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + regionId + ")이 존재하지 않습니다."));
+    }
+
+    private Rental getFacility(Long facilityId) {
+        return rentalRepository.findById(Math.toIntExact(facilityId))
+                .orElseThrow(() -> new IllegalArgumentException("시설(ID: " + facilityId + ")이 존재하지 않습니다."));
+    }
+
+    // ===== 내부 유틸 =====
+
+    private Program buildProgramFromDto(ProgramRequest dto) {
+        return Program.builder()
                 .title(dto.getTitle())
                 .region(getRegion(dto.getRegionId()))
                 .facility(getFacility(dto.getFacilityId()))
@@ -58,28 +154,9 @@ public class ProgramService {
                 .imageUrl(dto.getImageUrl())
                 .description(dto.getDescription())
                 .build();
-
-        return toResponse(programRepository.save(program));
     }
 
-    public List<ProgramResponse> getAllPrograms() {
-        log.info("[GET] 전체 프로그램 목록 조회");
-        return programRepository.findAll().stream()
-                .map(this::toResponse)
-                .toList();
-    }
-
-    public ProgramResponse getProgramById(Long id) {
-        log.info("[GET] 프로그램 상세 조회 - ID: {}", id);
-        return toResponse(getProgram(id));
-    }
-
-    @Transactional
-    public ProgramResponse updateProgram(Long id, ProgramRequest dto) {
-        log.info("[PUT] 프로그램 전체 수정 - ID: {}", id);
-
-        Program program = getProgram(id);
-
+    private void updateProgramFromDto(Program program, ProgramRequest dto) {
         program.setTitle(dto.getTitle());
         program.setRegion(getRegion(dto.getRegionId()));
         program.setFacility(getFacility(dto.getFacilityId()));
@@ -90,123 +167,32 @@ public class ProgramService {
         program.setUsageStartDate(dto.getUsageStartDate());
         program.setUsageEndDate(dto.getUsageEndDate());
         program.setClassStartTime(dto.getClassStartTime());
-        program.setClassEndTime(dto.getClassEndTime());
-        program.setRegistrationStartDate(dto.getRegistrationStartDate());
-        program.setRegistrationEndDate(dto.getRegistrationEndDate());
-        program.setCancelEndDate(dto.getCancelEndDate());
-        program.setFee(dto.getFee());
-        program.setCapacity(dto.getCapacity());
-        program.setContact(dto.getContact());
-        program.setImageUrl(dto.getImageUrl());
-        program.setDescription(dto.getDescription());
-
-        return toResponse(program);
     }
-
-    @Transactional
-    public ProgramResponse partialUpdateProgram(Long id, Map<String, Object> updates) {
-        log.info("[PATCH] 프로그램 부분 수정 - ID: {}", id);
-
-        Program program = getProgram(id);
-
-        Set<String> allowedFields = Set.of(
-                "title", "regionId", "facilityId", "category", "target", "instructorName", "status",
-                "usageStartDate", "usageEndDate", "classStartTime", "classEndTime",
-                "registrationStartDate", "registrationEndDate", "cancelEndDate",
-                "fee", "capacity", "contact", "imageUrl", "description"
-        );
-
-        for (Map.Entry<String, Object> entry : updates.entrySet()) {
-            String fieldName = entry.getKey();
-            Object value = entry.getValue();
-            if (!allowedFields.contains(fieldName)) continue;
-
-            try {
-                switch (fieldName) {
-                    case "regionId" -> program.setRegion(getRegion(Long.parseLong(value.toString())));
-                    case "facilityId" -> program.setFacility(getFacility(Long.parseLong(value.toString())));
-                    case "status" -> program.setStatus("closed".equalsIgnoreCase(value.toString()) ? Program.Status.CLOSED : Program.Status.OPEN);
-                    case "usageStartDate", "usageEndDate", "registrationStartDate", "registrationEndDate", "cancelEndDate" -> {
-                        LocalDate date = LocalDate.parse(value.toString());
-                        Field field = Program.class.getDeclaredField(fieldName);
-                        field.setAccessible(true);
-                        field.set(program, date);
-                    }
-                    case "classStartTime", "classEndTime" -> {
-                        LocalTime time = LocalTime.parse(value.toString());
-                        Field field = Program.class.getDeclaredField(fieldName);
-                        field.setAccessible(true);
-                        field.set(program, time);
-                    }
-                    default -> {
-                        Field field = Program.class.getDeclaredField(fieldName);
-                        field.setAccessible(true);
-                        if (field.getType().equals(Integer.class)) {
-                            field.set(program, Integer.parseInt(value.toString()));
-                        } else {
-                            field.set(program, value);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                throw new RuntimeException("필드 업데이트 실패: " + fieldName + " - " + e.getMessage(), e);
-            }
-        }
-
-        return toResponse(program);
-    }
-
-    @Transactional
-    public MessageResponse deleteProgram(Long id) {
-        log.info("[DELETE] 프로그램 삭제 - ID: {}", id);
-        if (!programRepository.existsById(id)) {
-            throw new IllegalArgumentException("삭제할 프로그램이 존재하지 않습니다.");
-        }
-        programRepository.deleteById(id);
-        return new MessageResponse("프로그램이 삭제되었습니다.");
-    }
-
-    // ===== 내부 유틸 =====
-
-    private Program getProgram(Long id) {
-        return programRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("프로그램(ID: " + id + ")이 존재하지 않습니다."));
-    }
-
-    private Region getRegion(Long regionId) {
-        return regionRepository.findById(regionId)
-                .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + regionId + ")이 존재하지 않습니다."));
-    }
-
-    private Rental getFacility(Long facilityId) {
-        return rentalRepository.findById(Math.toIntExact(facilityId))
-                .orElseThrow(() -> new IllegalArgumentException("시설(ID: " + facilityId + ")이 존재하지 않습니다."));
-    }
-
-    private void validateDuplicateTitle(String title) {
-        // 예시: title 중복 검사 필요 시 사용
-    }
-
-    private ProgramResponse toResponse(Program program) {
-        return ProgramResponse.builder()
+    private ProgramDisplayResponse toDisplayResponse(Program program) {
+        return ProgramDisplayResponse.builder()
                 .id(program.getId())
                 .title(program.getTitle())
-                .category(program.getCategory())
+                .location(program.getFacility().getLocation())
                 .target(program.getTarget())
-                .instructorName(program.getInstructorName())
-                .status(program.getStatus().name().toLowerCase())
-                .usageStartDate(program.getUsageStartDate())
-                .usageEndDate(program.getUsageEndDate())
-                .classStartTime(program.getClassStartTime())
-                .classEndTime(program.getClassEndTime())
-                .registrationStartDate(program.getRegistrationStartDate())
-                .registrationEndDate(program.getRegistrationEndDate())
-                .cancelEndDate(program.getCancelEndDate())
+                .usagePeriod(formatDateRange(program.getUsageStartDate(), program.getUsageEndDate()))
+                .classTime(formatTimeRange(program.getClassStartTime(), program.getClassEndTime()))
+                .registrationPeriod(formatDateRange(program.getRegistrationStartDate(), program.getRegistrationEndDate()))
+                .cancelEndDate(program.getCancelEndDate().toString())
                 .fee(program.getFee())
                 .capacity(program.getCapacity())
                 .contact(program.getContact())
-                .imageUrl(program.getImageUrl())
                 .description(program.getDescription())
+                .imageUrl(program.getImageUrl())
                 .build();
     }
+
+    private String formatDateRange(LocalDate start, LocalDate end) {
+        return start + " ~ " + end;
+    }
+
+    private String formatTimeRange(LocalTime start, LocalTime end) {
+        return start + " ~ " + end;
+    }
+
+
 }

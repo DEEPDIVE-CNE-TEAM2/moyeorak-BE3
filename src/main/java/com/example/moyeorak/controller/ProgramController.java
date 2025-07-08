@@ -1,8 +1,7 @@
 package com.example.moyeorak.controller;
 
-import com.example.moyeorak.dto.MessageResponse;
-import com.example.moyeorak.dto.ProgramRequest;
-import com.example.moyeorak.dto.ProgramResponse;
+import com.example.moyeorak.dto.*;
+import com.example.moyeorak.service.EnrollmentService;
 import com.example.moyeorak.service.ProgramService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,37 +21,25 @@ public class ProgramController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProgramResponse> createProgram(@RequestBody @Valid ProgramRequest request) {
-        ProgramResponse response = programService.createProgram(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ProgramDisplayResponse> createProgram(@RequestBody @Valid ProgramRequest request) {
+        return ResponseEntity.ok(programService.createProgram(request));
     }
 
     @GetMapping
-    public ResponseEntity<List<ProgramResponse>> getAllPrograms() {
-        List<ProgramResponse> programs = programService.getAllPrograms();
-        return ResponseEntity.ok(programs);
+    public ResponseEntity<List<ProgramDisplayResponse>> getAllPrograms() {
+        return ResponseEntity.ok(programService.getAllPrograms());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProgramResponse> getProgramById(@PathVariable Long id) {
-        ProgramResponse program = programService.getProgramById(id);
-        return ResponseEntity.ok(program);
-    }
-
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProgramResponse> updateProgram(@PathVariable Long id,
-                                                         @RequestBody @Valid ProgramRequest request) {
-        ProgramResponse updated = programService.updateProgram(id, request);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<ProgramDisplayResponse> getProgramById(@PathVariable Long id) {
+        return ResponseEntity.ok(programService.getProgramById(id));
     }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProgramResponse> patchProgram(@PathVariable Long id,
-                                                        @RequestBody Map<String, Object> updates) {
-        ProgramResponse updated = programService.partialUpdateProgram(id, updates);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<ProgramDisplayResponse> patchProgram(@PathVariable Long id,
+                                                               @RequestBody Map<String, Object> updates) {
+        return ResponseEntity.ok(programService.partialUpdateProgram(id, updates));
     }
 
     @DeleteMapping("/{id}")
@@ -61,5 +48,4 @@ public class ProgramController {
         programService.deleteProgram(id);
         return ResponseEntity.ok(new MessageResponse("프로그램이 삭제되었습니다."));
     }
-
 }

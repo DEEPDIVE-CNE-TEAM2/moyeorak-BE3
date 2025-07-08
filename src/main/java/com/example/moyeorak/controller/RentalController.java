@@ -1,7 +1,9 @@
 package com.example.moyeorak.controller;
 
 import com.example.moyeorak.dto.*;
+import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.service.RentalService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,13 +21,24 @@ import java.util.Map;
 public class RentalController {
 
     private final RentalService rentalService;
+    private final JwtProvider jwtProvider;
 
     // ✅ 대관 등록 (전체 데이터 + 지역명 + 담당자 이메일 포함)
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<RentalCreateResponse> createRental(@RequestBody @Valid RentalRequest request) {
-        log.info("[POST] 대관 등록 요청: {}", request);
-        RentalCreateResponse created = rentalService.createRental(request);
+    public ResponseEntity<RentalCreateResponse> createRental(
+            @RequestBody @Valid RentalRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        String token = servletRequest.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("유효하지 않은 토큰입니다.");
+        }
+
+        String email = jwtProvider.getEmail(token.substring(7));
+        log.info("[POST] 대관 등록 요청 by 관리자: {}", email);
+
+        RentalCreateResponse created = rentalService.createRental(request, email);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 

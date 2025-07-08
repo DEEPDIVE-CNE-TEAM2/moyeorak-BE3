@@ -35,7 +35,8 @@ public class RentalCreateResponse {
     private String contact;
     private String address;
 
-    private Long regionId;          // 지역 ID
-    private String regionName;      // 지역 이름
-    private String managerEmail;    // 담당자 이메일
+    private String regionName;       // 지역 이름
+    private String managerName;      // 관리자 이름 ← 추가
+    private String managerEmail;     // 관리자 이메일
 }
+

@@ -14,20 +14,12 @@ import java.time.LocalDateTime;
 public class RentalApplicationResponse {
 
     private Long id;
-    private Integer userId;
-    private Integer rentalId;
-    private Integer regionId;
+    private String location;
+    private String address;
     private LocalDate requestedDate;
-    private LocalTime requestedStartTime;
-    private LocalTime requestedEndTime;
-    private String status;
-    private String note;
-    private LocalDateTime createdAt;
-    public RentalApplicationResponse(Long id, String status, String note, LocalDateTime createdAt) {
-        this.id = id;
-        this.status = status;
-        this.note = note;
-        this.createdAt = createdAt;
-    }
-}
+    private String requestedTime;
+    private Integer capacity;
 
+    private String status;       // ✅ 추가: 내부 코드 ("approved")
+    private String statusLabel;  // ✅ 추가: 한글 라벨 ("승인")
+}

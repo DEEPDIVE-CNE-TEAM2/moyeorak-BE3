@@ -27,9 +27,12 @@ public class RentalService {
     /**
      * ✅ 대관 등록
      */
-    public RentalCreateResponse createRental(RentalRequest request) {
-        Region region = regionRepository.findById(request.getRegionId())
-                .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
+    public RentalCreateResponse createRental(RentalRequest request, String adminEmail) {
+        // 🔒 관리자 이메일로 본인이 관리하는 Region을 찾음
+        Region region = regionRepository.findAll().stream()
+                .filter(r -> r.getManager() != null && adminEmail.equals(r.getManager().getEmail()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("관리자가 담당하는 지역이 없습니다."));
 
         Rental rental = Rental.builder()
                 .region(region)
@@ -143,6 +146,7 @@ public class RentalService {
         return RentalCreateResponse.builder()
                 .id(Math.toIntExact(rental.getId()))
                 .regionName(rental.getRegion().getName())
+                .managerName(manager != null ? manager.getName() : null)
                 .managerEmail(manager != null ? manager.getEmail() : null)
                 .category(rental.getCategory())
                 .location(rental.getLocation())

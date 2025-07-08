@@ -1,9 +1,13 @@
 package com.example.moyeorak.jwt;
 
 import com.example.moyeorak.repository.UserRepository;
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
+import com.example.moyeorak.security.CustomUserDetails;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -34,17 +39,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 var user = userRepository.findByEmail(email).orElse(null);
 
                 if (user != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    var userDetails = new com.example.moyeorak.security.CustomUserDetails(user);
-                    var authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name().toUpperCase());
+                    // 권한 생성 (Spring Security는 "ROLE_" 접두어가 필요함)
+                    String role = "ROLE_" + user.getRole().name().toUpperCase();
+                    var authorities = List.of(new SimpleGrantedAuthority(role));
 
-                    var auth = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, List.of(authority)
+                    // 사용자 정보 객체 생성
+                    var userDetails = new CustomUserDetails(
+                            user.getId(),
+                            user.getEmail(),
+                            user.getRole().name(),
+                            authorities
                     );
 
+                    // 인증 토큰 생성 및 등록
+                    var auth = new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(auth);
+
+                    log.debug("✅ JWT 인증 성공 - 사용자: {}, 권한: {}", email, role);
                 }
             } else {
-                System.out.println("Invalid JWT token received");
+                log.warn("❌ 유효하지 않은 JWT 토큰: {}", token);
             }
         }
 
