@@ -35,10 +35,9 @@ public class UserSignupRequestDto {
     @NotNull(message = "생년월일은 필수입니다.")
     private LocalDate birth;
 
-    @NotBlank(message = "주소는 필수입니다.")
-    private String address;
-
     private User.Role role;
+
+    private Long regionId;
 
     public User.Role getRoleOrDefault() {
         return role != null ? role : User.Role.USER;

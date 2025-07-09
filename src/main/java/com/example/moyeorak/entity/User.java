@@ -50,9 +50,6 @@ public class User {
     private Role role;
 
     @Column(nullable = false)
-    private String address;
-
-    @Column(nullable = false)
     private LocalDate birth;
 
     @CreatedDate
@@ -63,7 +60,10 @@ public class User {
 
     private String refreshToken;
 
-    // (Optional) 유저가 속한 지역 (관리자만 사용)
     @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Region> managedRegions;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id")
+    private Region region;
 }

@@ -1,8 +1,10 @@
 package com.example.moyeorak.service;
 
 import com.example.moyeorak.dto.*;
+import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
 import com.example.moyeorak.jwt.JwtProvider;
+import com.example.moyeorak.repository.RegionRepository;
 import com.example.moyeorak.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +13,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -21,6 +22,7 @@ import java.util.function.Consumer;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final RegionRepository regionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
@@ -36,8 +38,16 @@ public class UserService {
         validateDuplicateEmail(email);
         validateDuplicatePhone(phone);
 
-        // 🔥 role 처리: 기본값은 USER
-        User.Role role = dto.getRole() != null ? dto.getRole() : User.Role.USER;
+        User.Role role = dto.getRoleOrDefault();
+
+        Region region = null;
+        if (role == User.Role.USER) {
+            if (dto.getRegionId() == null) {
+                throw new IllegalArgumentException("일반 사용자는 지역을 반드시 선택해야 합니다.");
+            }
+            region = regionRepository.findById(dto.getRegionId())
+                    .orElseThrow(() -> new IllegalArgumentException("선택한 지역이 존재하지 않습니다."));
+        }
 
         User user = User.builder()
                 .email(email)
@@ -45,9 +55,9 @@ public class UserService {
                 .name(dto.getName())
                 .gender(dto.getGender())
                 .phone(phone)
-                .address(dto.getAddress())
                 .birth(dto.getBirth())
                 .role(role)
+                .region(region)
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -56,10 +66,9 @@ public class UserService {
                 .email(savedUser.getEmail())
                 .name(savedUser.getName())
                 .phone(savedUser.getPhone())
-                .address(savedUser.getAddress())
+                .regionName(region != null ? region.getName() : null)
                 .build();
     }
-
 
     // ✅ 로그인
     public LoginResponseDto login(UserLoginRequestDto dto) {

@@ -14,9 +14,9 @@ public class UserResponseDto {
     private String name;
     private String phone;
     private String gender;
-    private String address;
     private String role;
     private LocalDate birth;
+    private String regionName;
 
     public static UserResponseDto fromEntity(User user) {
         return new UserResponseDto(
@@ -25,9 +25,9 @@ public class UserResponseDto {
                 user.getName(),
                 user.getPhone(),
                 user.getGender().name(),
-                user.getAddress(),
                 user.getRole().name(),
-                user.getBirth()
+                user.getBirth(),
+                user.getRegion() != null ? user.getRegion().getName() : null
         );
     }
 }
