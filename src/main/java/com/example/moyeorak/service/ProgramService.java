@@ -55,7 +55,7 @@ public class ProgramService {
                 "title", "regionId", "facilityId", "category", "target", "instructorName", "status",
                 "usageStartDate", "usageEndDate", "classStartTime", "classEndTime",
                 "registrationStartDate", "registrationEndDate", "cancelEndDate",
-                "fee", "capacity", "contact", "imageUrl", "description"
+                "inPrice", "outPrice", "capacity", "contact", "imageUrl", "description"
         );
 
         updates.forEach((fieldName, value) -> {
@@ -148,7 +148,8 @@ public class ProgramService {
                 .registrationStartDate(dto.getRegistrationStartDate())
                 .registrationEndDate(dto.getRegistrationEndDate())
                 .cancelEndDate(dto.getCancelEndDate())
-                .fee(dto.getFee())
+                .inPrice(dto.getInPrice())
+                .outPrice(dto.getOutPrice())
                 .capacity(dto.getCapacity())
                 .contact(dto.getContact())
                 .imageUrl(dto.getImageUrl())
@@ -167,7 +168,18 @@ public class ProgramService {
         program.setUsageStartDate(dto.getUsageStartDate());
         program.setUsageEndDate(dto.getUsageEndDate());
         program.setClassStartTime(dto.getClassStartTime());
+        program.setClassEndTime(dto.getClassEndTime());
+        program.setRegistrationStartDate(dto.getRegistrationStartDate());
+        program.setRegistrationEndDate(dto.getRegistrationEndDate());
+        program.setCancelEndDate(dto.getCancelEndDate());
+        program.setInPrice(dto.getInPrice());
+        program.setOutPrice(dto.getOutPrice());
+        program.setCapacity(dto.getCapacity());
+        program.setContact(dto.getContact());
+        program.setImageUrl(dto.getImageUrl());
+        program.setDescription(dto.getDescription());
     }
+
     private ProgramDisplayResponse toDisplayResponse(Program program) {
         return ProgramDisplayResponse.builder()
                 .id(program.getId())
@@ -178,7 +190,8 @@ public class ProgramService {
                 .classTime(formatTimeRange(program.getClassStartTime(), program.getClassEndTime()))
                 .registrationPeriod(formatDateRange(program.getRegistrationStartDate(), program.getRegistrationEndDate()))
                 .cancelEndDate(program.getCancelEndDate().toString())
-                .fee(program.getFee())
+                .inPrice(program.getInPrice())
+                .outPrice(program.getOutPrice())
                 .capacity(program.getCapacity())
                 .contact(program.getContact())
                 .description(program.getDescription())
@@ -201,5 +214,4 @@ public class ProgramService {
                 .map(this::toDisplayResponse)
                 .toList();
     }
-
 }

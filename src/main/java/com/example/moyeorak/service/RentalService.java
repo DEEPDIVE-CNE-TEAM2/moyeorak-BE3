@@ -27,9 +27,7 @@ public class RentalService {
     private final RentalRepository rentalRepository;
     private final RegionRepository regionRepository;
 
-    /**
-     * ✅ 대관 등록
-     */
+    // ✅ 대관 생성
     @Transactional
     public RentalCreateResponse createRental(RentalRequest request, String adminEmail) {
         Region region = regionRepository.findAll().stream()
@@ -61,55 +59,7 @@ public class RentalService {
         return mapToCreateResponse(rentalRepository.save(rental));
     }
 
-    /**
-     * ✅ 관리자 자신의 지역 대관 목록 조회
-     */
-    public List<RentalListResponse> getRentalsByManagerEmail(String email) {
-        Region region = regionRepository.findAll().stream()
-                .filter(r -> r.getManager() != null && email.equals(r.getManager().getEmail()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("관리자의 담당 지역이 없습니다."));
-
-        return rentalRepository.findByRegionId(region.getId()).stream()
-                .map(this::mapToListResponse)
-                .toList();
-    }
-
-    /**
-     * ✅ 지역별 대관 목록 조회 (사용자)
-     */
-    public List<RentalListResponse> getRentalsByRegion(Long regionId) {
-        return rentalRepository.findByRegionId(regionId).stream()
-                .map(this::mapToListResponse)
-                .toList();
-    }
-
-    /**
-     * ✅ 지역별 대관 상세 조회
-     */
-    public RentalDetailResponse getRentalDetailInRegion(Long regionId, Long rentalId) {
-        Rental rental = rentalRepository.findById(Math.toIntExact(rentalId))
-                .orElseThrow(() -> new IllegalArgumentException("해당 대관 정보가 없습니다."));
-
-        if (!rental.getRegion().getId().equals(regionId)) {
-            throw new IllegalArgumentException("해당 지역에 속한 대관이 아닙니다.");
-        }
-
-        return mapToDetailResponse(rental);
-    }
-
-    /**
-     * ✅ 지역별 시설 목록 조회 (면적 포함)
-     */
-    public List<FacilityResponse> getFacilitiesByRegion(Long regionId) {
-        return rentalRepository.findByRegionId(regionId).stream()
-                .map(this::mapToFacilityResponse)
-                .toList();
-    }
-
-    /**
-     * ✅ 대관 부분 수정
-     */
+    // ✅ 대관 부분 수정
     @Transactional
     public RentalCreateResponse partialUpdateRental(Long id, Map<String, Object> updates) {
         Rental rental = rentalRepository.findById(Math.toIntExact(id))
@@ -160,9 +110,7 @@ public class RentalService {
         return mapToCreateResponse(rental);
     }
 
-    /**
-     * ✅ 대관 삭제
-     */
+    // ✅ 대관 삭제
     @Transactional
     public void deleteRental(Long id) {
         if (!rentalRepository.existsById(Math.toIntExact(id))) {
@@ -171,7 +119,45 @@ public class RentalService {
         rentalRepository.deleteById(Math.toIntExact(id));
     }
 
-    // ===================== 응답 DTO 변환 =====================
+    // ✅ 관리자 이메일로 대관 조회
+    public List<RentalListResponse> getRentalsByManagerEmail(String email) {
+        Region region = regionRepository.findAll().stream()
+                .filter(r -> r.getManager() != null && email.equals(r.getManager().getEmail()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("관리자의 담당 지역이 없습니다."));
+
+        return rentalRepository.findByRegionId(region.getId()).stream()
+                .map(this::mapToListResponse)
+                .toList();
+    }
+
+    // ✅ 지역 ID로 대관 목록 조회
+    public List<RentalListResponse> getRentalsByRegion(Long regionId) {
+        return rentalRepository.findByRegionId(regionId).stream()
+                .map(this::mapToListResponse)
+                .toList();
+    }
+
+    // ✅ 지역 내 대관 상세 조회
+    public RentalDetailResponse getRentalDetailInRegion(Long regionId, Long rentalId) {
+        Rental rental = rentalRepository.findById(Math.toIntExact(rentalId))
+                .orElseThrow(() -> new IllegalArgumentException("해당 대관 정보가 없습니다."));
+
+        if (!rental.getRegion().getId().equals(regionId)) {
+            throw new IllegalArgumentException("해당 지역에 속한 대관이 아닙니다.");
+        }
+
+        return mapToDetailResponse(rental);
+    }
+
+    // ✅ 시설 정보 조회 (지도 등)
+    public List<FacilityResponse> getFacilitiesByRegion(Long regionId) {
+        return rentalRepository.findByRegionId(regionId).stream()
+                .map(this::mapToFacilityResponse)
+                .toList();
+    }
+
+    // ===================== DTO 변환 =====================
 
     private RentalCreateResponse mapToCreateResponse(Rental rental) {
         User manager = rental.getRegion().getManager();
@@ -223,7 +209,7 @@ public class RentalService {
                 .cancelEndDate(rental.getCancelEndDate().toString())
                 .capacity(rental.getCapacity())
                 .contact(rental.getContact())
-                .imageUrl(rental.getImageUrl()) // ✅ 추가
+                .imageUrl(rental.getImageUrl())
                 .build();
     }
 
@@ -234,9 +220,12 @@ public class RentalService {
                 .address(rental.getAddress())
                 .area(rental.getArea())
                 .usageTime(formatTimeRange(rental.getUsageStartTime(), rental.getUsageEndTime()))
-                .imageUrl(rental.getImageUrl()) // ✅ 추가
+                .imageUrl(rental.getImageUrl())
+                .contact(rental.getContact())
                 .build();
     }
+
+    // ===================== 포맷 유틸 =====================
 
     private String formatTimeRange(LocalTime start, LocalTime end) {
         return start + " ~ " + end;

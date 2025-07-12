@@ -24,12 +24,20 @@ public class CustomUserDetails implements UserDetails {
         this.authorities = authorities;
     }
 
-    // ✅ User 객체 기반 생성자 구현
     public CustomUserDetails(User user) {
         this.id = user.getId();
         this.email = user.getEmail();
         this.password = user.getPassword();
         this.authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
+    }
+
+    // ✅ 여기가 핵심입니다!
+    public Long getId() {
+        return id;
+    }
+
+    public String getEmail() {
+        return email;
     }
 
     @Override public String getUsername() { return email; }

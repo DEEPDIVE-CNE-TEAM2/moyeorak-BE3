@@ -31,7 +31,7 @@ public class ProgramRequest {
     @NotBlank
     private String instructorName;
 
-    private String status; // "open" or "closed" (optional)
+    private String status;
 
     @NotNull
     private LocalDate usageStartDate;
@@ -51,7 +51,11 @@ public class ProgramRequest {
 
     @NotNull
     @Min(0)
-    private Integer fee;
+    private Integer inPrice;
+
+    @NotNull
+    @Min(0)
+    private Integer outPrice;
 
     @NotNull
     @Min(1)
@@ -63,4 +67,3 @@ public class ProgramRequest {
     private String imageUrl;
     private String description;
 }
-

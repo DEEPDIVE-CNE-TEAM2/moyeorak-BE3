@@ -10,13 +10,11 @@ import com.example.moyeorak.repository.RegionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.AccessDeniedException;
 import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -26,7 +24,8 @@ public class NoticeService {
     private final NoticeRepository noticeRepository;
     private final RegionRepository regionRepository;
 
-    // ✅ 공지 생성
+    // ======================== 생성 ========================
+
     @Transactional
     public NoticeDto create(User author, NoticeRequest request) {
         log.info("[CREATE] 공지 생성 요청 - title: {}, regionId: {}, authorId: {}",
@@ -49,13 +48,21 @@ public class NoticeService {
         return toDto(noticeRepository.save(notice));
     }
 
-    // ✅ 공지 단건 조회
+    // ======================== 조회 ========================
+
     public NoticeDto getNotice(Long id) {
         log.info("[GET] 공지 단건 조회 요청 - id: {}", id);
         return toDto(findNotice(id));
     }
 
-    // ✅ 지역별 공지 조회
+    @Transactional
+    public NoticeDto getNoticeAndIncreaseViewCount(Long id) {
+        log.info("[GET] 공지 조회 및 조회수 증가 요청 - id: {}", id);
+        Notice notice = findNotice(id);
+        notice.setViewCount(notice.getViewCount() + 1);
+        return toDto(notice);
+    }
+
     public List<NoticeDto> getNoticesByRegionId(Long regionId) {
         log.info("[GET] 지역별 공지 목록 조회 - regionId: {}", regionId);
         return noticeRepository.findByRegionId(regionId).stream()
@@ -63,7 +70,24 @@ public class NoticeService {
                 .toList();
     }
 
-    // ✅ 공지 수정 (작성자만 가능)
+    public NoticeDto getNoticeByRegion(Long noticeId, Long regionId) {
+        log.info("[GET] 지역별 공지 단건 조회 요청 - regionId: {}, noticeId: {}", regionId, noticeId);
+
+        Notice notice = noticeRepository.findByIdAndRegionId(noticeId, regionId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 지역에 공지사항이 존재하지 않습니다."));
+
+        return toDto(notice);
+    }
+
+    public List<NoticeDto> getAllNotices() {
+        log.info("[GET] 전체 공지 목록 조회");
+        return noticeRepository.findAll().stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    // ======================== 수정 ========================
+
     @Transactional
     public NoticeDto updateNotice(Long noticeId, Long userId, NoticeRequest request) throws AccessDeniedException {
         log.info("[UPDATE] 공지 수정 요청 - noticeId: {}, userId: {}", noticeId, userId);
@@ -80,7 +104,8 @@ public class NoticeService {
         return toDto(noticeRepository.save(notice));
     }
 
-    // ✅ 공지 삭제 (작성자만 가능)
+    // ======================== 삭제 ========================
+
     @Transactional
     public void deleteNotice(Long id, Long userId) throws AccessDeniedException {
         log.info("[DELETE] 공지 삭제 요청 - noticeId: {}, userId: {}", id, userId);
@@ -94,15 +119,7 @@ public class NoticeService {
         noticeRepository.delete(notice);
     }
 
-    // ✅ 전체 공지 조회 (관리자용)
-    public List<NoticeDto> getAllNotices() {
-        log.info("[GET] 전체 공지 목록 조회");
-        return noticeRepository.findAll().stream()
-                .map(this::toDto)
-                .toList();
-    }
-
-    // ========== 내부 메서드 ==========
+    // ======================== 내부 유틸 ========================
 
     private Notice findNotice(Long id) {
         return noticeRepository.findById(id)
@@ -111,15 +128,5 @@ public class NoticeService {
 
     private NoticeDto toDto(Notice notice) {
         return NoticeDto.fromEntity(notice);
-    }
-
-    // NoticeService.java
-    public NoticeDto getNoticeByRegion(Long noticeId, Long regionId) {
-        log.info("[GET] 지역별 공지 단건 조회 요청 - regionId: {}, noticeId: {}", regionId, noticeId);
-
-        Notice notice = noticeRepository.findByIdAndRegionId(noticeId, regionId)
-                .orElseThrow(() -> new EntityNotFoundException("해당 지역에 공지사항이 존재하지 않습니다."));
-
-        return toDto(notice);
     }
 }

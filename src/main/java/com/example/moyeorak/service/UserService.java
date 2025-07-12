@@ -45,6 +45,7 @@ public class UserService {
             if (dto.getRegionId() == null) {
                 throw new IllegalArgumentException("일반 사용자는 지역을 반드시 선택해야 합니다.");
             }
+
             region = regionRepository.findById(dto.getRegionId())
                     .orElseThrow(() -> new IllegalArgumentException("선택한 지역이 존재하지 않습니다."));
         }
@@ -151,6 +152,19 @@ public class UserService {
         userRepository.delete(user);
     }
 
+    // ✅ 전체 사용자 조회 (관리자용)
+    public List<UserResponseDto> getAllUsers() {
+        return userRepository.findAll(Sort.by("id").descending()).stream()
+                .map(UserResponseDto::fromEntity)
+                .toList();
+    }
+
+    // ✅ 비밀번호 검증 (verify-password용)
+    public boolean verifyPassword(String email, String password) {
+        User user = getUserByEmail(email);
+        return passwordEncoder.matches(password, user.getPassword());
+    }
+
     // ✅ 중복 확인
     public boolean isEmailDuplicate(String email) {
         return userRepository.findByEmail(email.trim().toLowerCase()).isPresent();
@@ -166,24 +180,11 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
     }
 
-    // ✅ 전체 사용자 조회 (관리자용)
-    public List<UserResponseDto> getAllUsers() {
-        return userRepository.findAll(Sort.by("id").descending()).stream()
-                .map(UserResponseDto::fromEntity)
-                .toList();
-    }
-
     // ✅ 수정 시 필드 변경 감지
     private void updateIfChanged(String newValue, String currentValue, Consumer<String> updater) {
         if (newValue != null && !newValue.equals(currentValue)) {
             updater.accept(newValue);
         }
-    }
-
-    // ✅ 비밀번호 검증 (verify-password용)
-    public boolean verifyPassword(String email, String password) {
-        User user = getUserByEmail(email);
-        return passwordEncoder.matches(password, user.getPassword());
     }
 
     // ✅ 중복 체크 유틸

@@ -13,5 +13,6 @@ public class FacilityResponse {
     private String address;
     private Integer area;
     private String usageTime;
-    private String imageUrl; // ✅ 추가
+    private String imageUrl;
+    private String contact; // ✅ 추가
 }

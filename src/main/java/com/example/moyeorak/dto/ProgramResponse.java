@@ -24,7 +24,8 @@ public class ProgramResponse {
     private LocalDate registrationStartDate;
     private LocalDate registrationEndDate;
     private LocalDate cancelEndDate;
-    private Integer fee;
+    private Integer inPrice;
+    private Integer outPrice;
     private Integer capacity;
     private String contact;
     private String imageUrl;

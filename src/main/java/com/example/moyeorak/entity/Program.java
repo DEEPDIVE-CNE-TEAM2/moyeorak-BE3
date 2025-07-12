@@ -65,7 +65,10 @@ public class Program {
     private LocalDate cancelEndDate;
 
     @Column(nullable = false)
-    private Integer fee;
+    private Integer inPrice;
+
+    @Column(nullable = false)
+    private Integer outPrice;
 
     @Column(nullable = false)
     private Integer capacity;
