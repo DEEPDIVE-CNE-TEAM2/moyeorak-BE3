@@ -26,8 +26,14 @@ public class ProgramController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProgramDisplayResponse>> getAllPrograms() {
-        return ResponseEntity.ok(programService.getAllPrograms());
+    public ResponseEntity<List<ProgramDisplayResponse>> getPrograms(
+            @RequestParam(value = "regionId", required = false) Long regionId
+    ) {
+        if (regionId != null) {
+            return ResponseEntity.ok(programService.getProgramsByRegion(regionId));
+        } else {
+            return ResponseEntity.ok(programService.getAllPrograms());
+        }
     }
 
     @GetMapping("/{id}")
