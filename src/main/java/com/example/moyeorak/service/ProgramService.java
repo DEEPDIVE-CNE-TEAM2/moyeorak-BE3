@@ -196,6 +196,7 @@ public class ProgramService {
                 .contact(program.getContact())
                 .description(program.getDescription())
                 .imageUrl(program.getImageUrl())
+                .regionId(program.getRegion().getId())
                 .build();
     }
 

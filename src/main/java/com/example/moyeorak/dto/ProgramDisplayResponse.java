@@ -23,4 +23,5 @@ public class ProgramDisplayResponse {
     private String contact;
     private String description;
     private String imageUrl;
+    private Long regionId;
 }

@@ -111,7 +111,6 @@ public class EnrollmentService {
 
     private Program findProgramByRequest(EnrollmentRequest request) {
         return programRepository.findAll().stream()
-                .filter(p -> p.getRegion().getId().equals(request.getRegionId())) // ✅ 지역 필터 추가
                 .filter(p -> p.getTitle().equals(request.getProgramTitle()))
                 .filter(p -> p.getFacility().getLocation().equals(request.getCenter()))
                 .filter(p -> formatDateRange(p.getUsageStartDate(), p.getUsageEndDate()).equals(request.getUsagePeriod()))

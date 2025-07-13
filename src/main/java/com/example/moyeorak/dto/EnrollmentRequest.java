@@ -24,7 +24,4 @@ public class EnrollmentRequest {
 
     @NotNull
     private Integer paidAmount;   // 수강료
-
-    @NotNull(message = "지역 ID는 필수입니다.")
-    private Long regionId;
 }
