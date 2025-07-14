@@ -22,33 +22,42 @@ public class ProgramService {
     private final ProgramRepository programRepository;
     private final RegionRepository regionRepository;
     private final RentalRepository rentalRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public ProgramDisplayResponse createProgram(ProgramRequest dto) {
         log.info("[CREATE] 프로그램 등록 요청: {}", dto);
-
         validateDuplicateTitle(dto.getTitle());
 
         Program program = buildProgramFromDto(dto);
-        return toDisplayResponse(programRepository.save(program));
+        return toDisplayResponse(programRepository.save(program), null); // 생성 시 사용자 없음
     }
 
-    public List<ProgramDisplayResponse> getAllPrograms() {
-        log.info("[GET] 전체 프로그램 목록 조회");
+    public List<ProgramDisplayResponse> getAllPrograms(Long userId) {
+        User user = getUser(userId);
+        log.info("[GET] 전체 프로그램 목록 조회 - userId: {}", userId);
         return programRepository.findAll().stream()
-                .map(this::toDisplayResponse)
+                .map(p -> toDisplayResponse(p, user))
                 .toList();
     }
 
-    public ProgramDisplayResponse getProgramById(Long id) {
-        log.info("[GET] 프로그램 상세 조회 - ID: {}", id);
-        return toDisplayResponse(getProgram(id));
+    public List<ProgramDisplayResponse> getProgramsByRegion(Long regionId, Long userId) {
+        User user = getUser(userId);
+        log.info("[GET] 지역별 프로그램 목록 조회 - regionId: {}, userId: {}", regionId, userId);
+        return programRepository.findByRegion_Id(regionId).stream()
+                .map(p -> toDisplayResponse(p, user))
+                .toList();
+    }
+
+    public ProgramDisplayResponse getProgramById(Long id, Long userId) {
+        User user = getUser(userId);
+        log.info("[GET] 프로그램 상세 조회 - ID: {}, userId: {}", id, userId);
+        return toDisplayResponse(getProgram(id), user);
     }
 
     @Transactional
     public ProgramDisplayResponse partialUpdateProgram(Long id, Map<String, Object> updates) {
         log.info("[PATCH] 프로그램 부분 수정 - ID: {}", id);
-
         Program program = getProgram(id);
 
         Set<String> allowedFields = Set.of(
@@ -65,8 +74,8 @@ public class ProgramService {
                 switch (fieldName) {
                     case "regionId" -> program.setRegion(getRegion(Long.parseLong(value.toString())));
                     case "facilityId" -> program.setFacility(getFacility(Long.parseLong(value.toString())));
-                    case "status" ->
-                            program.setStatus("closed".equalsIgnoreCase(value.toString()) ? Program.Status.CLOSED : Program.Status.OPEN);
+                    case "status" -> program.setStatus(
+                            "closed".equalsIgnoreCase(value.toString()) ? Program.Status.CLOSED : Program.Status.OPEN);
                     case "usageStartDate", "usageEndDate",
                          "registrationStartDate", "registrationEndDate", "cancelEndDate" -> {
                         Field field = Program.class.getDeclaredField(fieldName);
@@ -92,7 +101,7 @@ public class ProgramService {
             }
         });
 
-        return toDisplayResponse(program);
+        return toDisplayResponse(program, null); // 사용자 정보 없이 반환
     }
 
     @Transactional
@@ -130,7 +139,11 @@ public class ProgramService {
                 .orElseThrow(() -> new IllegalArgumentException("시설(ID: " + facilityId + ")이 존재하지 않습니다."));
     }
 
-    // ===== 내부 유틸 =====
+    private User getUser(Long userId) {
+        if (userId == null) return null;
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 없습니다."));
+    }
 
     private Program buildProgramFromDto(ProgramRequest dto) {
         return Program.builder()
@@ -157,30 +170,11 @@ public class ProgramService {
                 .build();
     }
 
-    private void updateProgramFromDto(Program program, ProgramRequest dto) {
-        program.setTitle(dto.getTitle());
-        program.setRegion(getRegion(dto.getRegionId()));
-        program.setFacility(getFacility(dto.getFacilityId()));
-        program.setCategory(dto.getCategory());
-        program.setTarget(dto.getTarget());
-        program.setInstructorName(dto.getInstructorName());
-        program.setStatus("closed".equalsIgnoreCase(dto.getStatus()) ? Program.Status.CLOSED : Program.Status.OPEN);
-        program.setUsageStartDate(dto.getUsageStartDate());
-        program.setUsageEndDate(dto.getUsageEndDate());
-        program.setClassStartTime(dto.getClassStartTime());
-        program.setClassEndTime(dto.getClassEndTime());
-        program.setRegistrationStartDate(dto.getRegistrationStartDate());
-        program.setRegistrationEndDate(dto.getRegistrationEndDate());
-        program.setCancelEndDate(dto.getCancelEndDate());
-        program.setInPrice(dto.getInPrice());
-        program.setOutPrice(dto.getOutPrice());
-        program.setCapacity(dto.getCapacity());
-        program.setContact(dto.getContact());
-        program.setImageUrl(dto.getImageUrl());
-        program.setDescription(dto.getDescription());
-    }
+    private ProgramDisplayResponse toDisplayResponse(Program program, User user) {
+        boolean inRegion = user != null &&
+                user.getRegion() != null &&
+                user.getRegion().getId().equals(program.getRegion().getId());
 
-    private ProgramDisplayResponse toDisplayResponse(Program program) {
         return ProgramDisplayResponse.builder()
                 .id(program.getId())
                 .title(program.getTitle())
@@ -192,6 +186,8 @@ public class ProgramService {
                 .cancelEndDate(program.getCancelEndDate().toString())
                 .inPrice(program.getInPrice())
                 .outPrice(program.getOutPrice())
+                .appliedPrice(inRegion ? program.getInPrice() : program.getOutPrice()) // ✅ 적용 가격
+                .inRegion(inRegion) // ✅ 관내 여부
                 .capacity(program.getCapacity())
                 .contact(program.getContact())
                 .description(program.getDescription())
@@ -201,20 +197,11 @@ public class ProgramService {
                 .build();
     }
 
-
     private String formatDateRange(LocalDate start, LocalDate end) {
         return start + " ~ " + end;
     }
 
     private String formatTimeRange(LocalTime start, LocalTime end) {
         return start + " ~ " + end;
-    }
-
-    public List<ProgramDisplayResponse> getProgramsByRegion(Long regionId) {
-        List<Program> programs = programRepository.findByRegion_Id(regionId);
-
-        return programs.stream()
-                .map(this::toDisplayResponse)
-                .toList();
     }
 }

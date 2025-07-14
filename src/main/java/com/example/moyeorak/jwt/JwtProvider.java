@@ -27,7 +27,7 @@ public class JwtProvider {
 
     public String generateToken(String email, String role) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + 1000L * 60 * 60);
+        Date expiryDate = new Date(now.getTime() + 1000L * 60 * 30); // 30분
 
         return Jwts.builder()
                 .setSubject(email)
@@ -40,7 +40,7 @@ public class JwtProvider {
 
     public String generateRefreshToken(String email) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + 1000L * 60 * 60 * 24 * 7);
+        Date expiryDate = new Date(now.getTime() + 1000L * 60 * 30); // 30분
 
         return Jwts.builder()
                 .setSubject(email)

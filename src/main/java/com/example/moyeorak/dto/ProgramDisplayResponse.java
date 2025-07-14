@@ -19,6 +19,8 @@ public class ProgramDisplayResponse {
     private String cancelEndDate;
     private Integer inPrice;
     private Integer outPrice;
+    private Integer appliedPrice;  // ✅ 사용자 기준 실제 납부 가격
+    private Boolean inRegion;      // ✅ 관내 여부
     private Integer capacity;
     private String contact;
     private String description;
