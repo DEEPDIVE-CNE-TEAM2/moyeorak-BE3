@@ -3,6 +3,7 @@ package com.example.moyeorak.dto;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Getter
 @Setter
@@ -19,4 +20,6 @@ public class EnrollmentResponse {
     private String status;
     private Integer paidAmount;
     private String cancelReason;
+    private LocalTime classStartTime;
+    private LocalTime classEndTime;
 }

@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Getter
@@ -44,6 +45,13 @@ public class Enrollment {
 
     @Column(name = "paid_amount")
     private Integer paidAmount;
+
+    // ✅ 수업 시간 추가
+    @Column(name = "class_start_time", nullable = false)
+    private LocalTime classStartTime;
+
+    @Column(name = "class_end_time", nullable = false)
+    private LocalTime classEndTime;
 
     public enum Status {
         ENROLLED, CANCELLED

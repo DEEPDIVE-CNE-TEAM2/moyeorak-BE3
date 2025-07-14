@@ -44,6 +44,8 @@ public class EnrollmentService {
                 .region(program.getRegion())
                 .status(Enrollment.Status.ENROLLED)
                 .paidAmount(request.getPaidAmount())
+                .classStartTime(program.getClassStartTime())  // ✅ 수업 시작 시간 저장
+                .classEndTime(program.getClassEndTime())      // ✅ 수업 종료 시간 저장
                 .build();
 
         return toResponse(enrollmentRepository.save(enrollment));
@@ -137,6 +139,8 @@ public class EnrollmentService {
                 .status(e.getStatus().name().toLowerCase())
                 .paidAmount(e.getPaidAmount())
                 .cancelReason(e.getCancelReason())
+                .classStartTime(e.getClassStartTime())
+                .classEndTime(e.getClassEndTime())
                 .build();
     }
 }
