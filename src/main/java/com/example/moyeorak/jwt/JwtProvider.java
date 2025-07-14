@@ -61,6 +61,16 @@ public class JwtProvider {
                 .getSubject();
     }
 
+    // ✅ 역할(role) 추출
+    public String getRole(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("roles", String.class);
+    }
+
     // ✅ 토큰 유효성 검증
     public boolean validateToken(String token) {
         try {
