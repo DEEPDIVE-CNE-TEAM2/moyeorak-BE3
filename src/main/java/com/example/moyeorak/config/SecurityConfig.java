@@ -4,6 +4,7 @@ import com.example.moyeorak.jwt.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -27,6 +28,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // ✅ CORS preflight 허용
                         .requestMatchers(
                                 "/actuator/health", "/actuator/info", "/health",
                                 "/api/users/signup", "/api/users/login",
@@ -56,9 +58,9 @@ public class SecurityConfig {
                 "http://localhost:3000",
                 "http://localhost:8080",
                 "http://goorm-alb-1610121085.ap-northeast-2.elb.amazonaws.com",
-		"https://www.moyeorak.cloud",
-		"https://moyeorak.cloud",
-		"https://api.moyeorak.cloud"
+                "https://www.moyeorak.cloud",
+                "https://moyeorak.cloud",
+                "https://api.moyeorak.cloud"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
