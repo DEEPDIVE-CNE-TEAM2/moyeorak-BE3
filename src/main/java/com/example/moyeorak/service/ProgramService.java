@@ -175,11 +175,14 @@ public class ProgramService {
         Long userRegionId = null;
         Long programRegionId = null;
 
-        if (user != null && user.getRegion() != null && program.getRegion() != null) {
-            userRegionId = user.getRegion().getId();
-            programRegionId = program.getRegion().getId();
-            inRegion = userRegionId.equals(programRegionId);
+        if (user != null) {
+            userRegionId = Optional.ofNullable(user.getRegion()).map(Region::getId).orElse(null);
         }
+        if (program.getRegion() != null) {
+            programRegionId = program.getRegion().getId();
+        }
+
+        inRegion = Objects.equals(userRegionId, programRegionId);
 
         log.info("관내 여부 판단: userRegionId = {}, programRegionId = {}, inRegion = {}",
                 userRegionId, programRegionId, inRegion);
