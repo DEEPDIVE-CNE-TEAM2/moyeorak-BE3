@@ -35,10 +35,13 @@ public class EnrollmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 없습니다."));
 
-        // usagePeriod: "2025-08-01 ~ 2025-08-31"
+        // 기간, 시간 파싱
         String[] dateParts = request.getUsagePeriod().split(" ~ ");
-        // usageTime: "09:00 ~ 11:00"
         String[] timeParts = request.getUsageTime().split(" ~ ");
+
+        if (dateParts.length != 2 || timeParts.length != 2) {
+            throw new IllegalArgumentException("기간 또는 시간이 올바르지 않습니다.");
+        }
 
         LocalDate usageStartDate = LocalDate.parse(dateParts[0].trim());
         LocalDate usageEndDate = LocalDate.parse(dateParts[1].trim());
@@ -68,6 +71,8 @@ public class EnrollmentService {
                 .region(program.getRegion())
                 .status(Enrollment.Status.ENROLLED)
                 .paidAmount(request.getPaidAmount())
+                .classStartTime(program.getClassStartTime())   // ✅ 수업 시간 저장
+                .classEndTime(program.getClassEndTime())
                 .build();
 
         return toResponse(enrollmentRepository.save(enrollment));
@@ -136,8 +141,8 @@ public class EnrollmentService {
                 .status(e.getStatus().name().toLowerCase())
                 .paidAmount(e.getPaidAmount())
                 .cancelReason(e.getCancelReason())
-                .classStartTime(e.getProgram().getClassStartTime())
-                .classEndTime(e.getProgram().getClassEndTime())
+                .classStartTime(e.getClassStartTime())     // ✅ 수강신청에 저장된 수업 시간 응답
+                .classEndTime(e.getClassEndTime())
                 .build();
     }
 }
