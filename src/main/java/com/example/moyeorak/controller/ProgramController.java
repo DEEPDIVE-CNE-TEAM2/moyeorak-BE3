@@ -38,7 +38,7 @@ public class ProgramController {
             @RequestParam(value = "regionId", required = false) Long regionId,
             @AuthenticationPrincipal CustomUserDetails user
     ) {
-        Long userId = user.getId();
+        Long userId = (user != null) ? user.getId() : null;
         log.info("[GET] 전체 또는 지역별 프로그램 목록 조회 - regionId: {}, userId: {}", regionId, userId);
         if (regionId != null) {
             return ResponseEntity.ok(programService.getProgramsByRegion(regionId, userId));
@@ -53,7 +53,7 @@ public class ProgramController {
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails user
     ) {
-        Long userId = user.getId();
+        Long userId = (user != null) ? user.getId() : null;
         log.info("[GET] 프로그램 상세 조회 - id: {}, userId: {}", id, userId);
         return ResponseEntity.ok(programService.getProgramById(id, userId));
     }

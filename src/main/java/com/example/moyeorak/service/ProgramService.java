@@ -171,9 +171,10 @@ public class ProgramService {
     }
 
     private ProgramDisplayResponse toDisplayResponse(Program program, User user) {
-        boolean inRegion = user != null &&
-                user.getRegion() != null &&
-                user.getRegion().getId().equals(program.getRegion().getId());
+        boolean inRegion = false;
+        if (user != null && user.getRegion() != null && program.getRegion() != null) {
+            inRegion = user.getRegion().getId().equals(program.getRegion().getId());
+        }
 
         return ProgramDisplayResponse.builder()
                 .id(program.getId())
@@ -186,8 +187,8 @@ public class ProgramService {
                 .cancelEndDate(program.getCancelEndDate().toString())
                 .inPrice(program.getInPrice())
                 .outPrice(program.getOutPrice())
-                .appliedPrice(inRegion ? program.getInPrice() : program.getOutPrice()) // ✅ 적용 가격
-                .inRegion(inRegion) // ✅ 관내 여부
+                .appliedPrice(inRegion ? program.getInPrice() : program.getOutPrice())
+                .inRegion(inRegion)
                 .capacity(program.getCapacity())
                 .contact(program.getContact())
                 .description(program.getDescription())
