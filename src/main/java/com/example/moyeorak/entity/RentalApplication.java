@@ -45,9 +45,6 @@ public class RentalApplication {
     @Column(nullable = false, length = 20)
     private RentalApplicationStatus status;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String note;
-
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
