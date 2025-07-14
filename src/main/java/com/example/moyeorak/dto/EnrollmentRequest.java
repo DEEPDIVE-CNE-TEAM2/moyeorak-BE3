@@ -15,7 +15,7 @@ public class EnrollmentRequest {
     private String programTitle;
 
     @NotBlank(message = "시설 위치는 필수입니다.")
-    private String place;
+    private String location;
 
     @NotBlank(message = "이용 기간은 필수입니다. 예: '2025-08-01 ~ 2025-08-31'")
     private String usagePeriod;

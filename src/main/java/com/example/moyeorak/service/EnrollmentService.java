@@ -52,7 +52,7 @@ public class EnrollmentService {
         Program program = programRepository
                 .findByTitleAndFacility_LocationAndUsageStartDateAndUsageEndDateAndClassStartTimeAndClassEndTime(
                         request.getProgramTitle(),
-                        request.getPlace(),
+                        request.getLocation(),
                         usageStartDate,
                         usageEndDate,
                         classStartTime,
