@@ -21,6 +21,5 @@ public class UserUpdateRequestDto {
 
     private String confirmPassword;
 
-    private String regionName;
+    private Long regionId;
 }
-
