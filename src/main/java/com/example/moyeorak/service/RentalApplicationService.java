@@ -123,9 +123,10 @@ public class RentalApplicationService {
                 .requestedDate(app.getRequestedDate())
                 .requestedTime(app.getRequestedStartTime() + " ~ " + app.getRequestedEndTime())
                 .capacity(rental.getCapacity())
-                .peopleCount(app.getPeopleCount()) // ✅ 응답 포함
+                .peopleCount(app.getPeopleCount())
                 .status(status.name().toLowerCase())
                 .statusLabel(status.getDisplayName())
+                .requestedTime(String.valueOf(app.getCreatedAt()))
                 .build();
     }
 

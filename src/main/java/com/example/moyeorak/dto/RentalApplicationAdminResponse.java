@@ -2,6 +2,8 @@ package com.example.moyeorak.dto;
 
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,5 +22,6 @@ public class RentalApplicationAdminResponse {
     private String status;
     private String statusLabel;
     private Integer peopleCount;
+    private LocalDateTime createdAt;
 }
 
