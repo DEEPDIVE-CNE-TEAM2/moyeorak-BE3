@@ -82,4 +82,20 @@ public class RentalApplicationController {
         log.info("[ADMIN] 전체 대관 신청 목록 조회");
         return ResponseEntity.ok(rentalApplicationService.getAllApplicationsForAdmin());
     }
+
+    // 대관신청 AWS SQS 비동기처리 
+    @PostMapping("/async")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<MessageResponse> asyncRentalApplication(
+        @Valid @RequestBody RentalApplicationRequest request,
+        @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+	String email = userDetails.getEmail();
+    	log.info("[ASYNC POST] 대관 신청 요청 비동기 처리 by {}", email);
+
+    	asyncRentalApplicationService.sendRentalApplication(request, email);
+
+    	return ResponseEntity.accepted().body(new MessageResponse("대관 신청 요청이 접수되었습니다."));
+    }
+
 }
