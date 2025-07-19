@@ -75,7 +75,9 @@ public class EnrollmentService {
                 .classEndTime(program.getClassEndTime())
                 .build();
 
-        return toResponse(enrollment, user);
+        // ✅ 저장 후 반환
+        Enrollment saved = enrollmentRepository.save(enrollment);
+        return toResponse(saved, user);
     }
 
     public List<EnrollmentResponse> getMyEnrollments(Long userId) {
@@ -145,7 +147,7 @@ public class EnrollmentService {
         return inRegion;
     }
 
-    // ✅ 사용자 포함된 Enrollment → DTO 변환 (regionLabel만 사용)
+    // ✅ 사용자 포함된 Enrollment → DTO 변환
     private EnrollmentResponse toResponse(Enrollment e, User user) {
         Program program = e.getProgram();
         boolean inRegion = isInRegion(user, program);
@@ -164,7 +166,7 @@ public class EnrollmentService {
                 .classStartTime(program.getClassStartTime())
                 .classEndTime(program.getClassEndTime())
                 .instructorName(program.getInstructorName())
-                .regionLabel(regionLabel)  // ✅ 텍스트로 전달
+                .regionLabel(regionLabel)
                 .build();
     }
 }
