@@ -21,8 +21,8 @@ public class AdminUserService {
     private final JwtProvider jwtProvider;
     private final RegionRepository regionRepository;
 
-    // 토큰 기반으로 관리자 식별 + 담당 지역 유저 조회
-    public List<AdminUserListResponseDto> getUsersByRegion(HttpServletRequest request, Long regionId) {
+    // 토큰 기반으로 관리자 식별 + 담당 지역 유저 조회 (키워드 필터링 포함)
+    public List<AdminUserListResponseDto> getUsersByRegionAndKeyword(HttpServletRequest request, Long regionId, String keyword) {
         // 1. 토큰에서 관리자 이메일 꺼내기
         String token = jwtProvider.resolveToken(request);
         String email = jwtProvider.getEmail(token);
@@ -47,8 +47,13 @@ public class AdminUserService {
                     .orElseThrow(() -> new IllegalArgumentException("해당 지역이 존재하지 않습니다."));
         }
 
-        // 4. 일반 유저만 조회 (관리자 제외)
-        List<User> users = userRepository.findByRegionAndRole(targetRegion, User.Role.USER);
+        // 4. 일반 유저만 조회 (관리자 제외) + 키워드 필터링
+        List<User> users;
+        if (keyword == null || keyword.trim().isEmpty()) {
+            users = userRepository.findByRegionAndRole(targetRegion, User.Role.USER);
+        } else {
+            users = userRepository.findByRegionAndRoleAndNameContainingIgnoreCase(targetRegion, User.Role.USER, keyword.trim());
+        }
 
         // 5. DTO 변환
         return users.stream()

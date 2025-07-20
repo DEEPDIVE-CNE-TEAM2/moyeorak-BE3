@@ -20,10 +20,11 @@ public class AdminUserController {
 
     // AccessToken 기반으로 관리자 유저 식별, null이면 자기 지역 값 있으면 그 지역 뜨게
     @GetMapping
-    public List<AdminUserListResponseDto> getUsersByRegion(
+    public List<AdminUserListResponseDto> getUsersByRegionAndKeyword(
             @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) String keyword,
             HttpServletRequest request
     ) {
-        return adminUserService.getUsersByRegion(request, regionId);
+        return adminUserService.getUsersByRegionAndKeyword(request, regionId, keyword);
     }
 }

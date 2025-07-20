@@ -14,4 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 회원조회할때 user만 보이게
     List<User> findByRegionAndRole(Region region, User.Role role);
+
+    // region, role, 이름(검색어) 포함(대소문자 무시) 조건으로 유저 필터링
+    List<User> findByRegionAndRoleAndNameContainingIgnoreCase(Region region, User.Role role, String name);
 }
