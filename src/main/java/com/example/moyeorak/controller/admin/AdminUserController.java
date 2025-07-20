@@ -4,6 +4,7 @@ import com.example.moyeorak.dto.admin.AdminUserDetailResponseDto;
 import com.example.moyeorak.dto.admin.AdminUserCreateRequestDto;
 import com.example.moyeorak.dto.admin.AdminUserListResponseDto;
 import com.example.moyeorak.dto.admin.AdminUserUpdateRequestDto;
+import com.example.moyeorak.dto.admin.AdminPasswordUpdateRequestDto;
 import com.example.moyeorak.service.admin.AdminUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,16 @@ public class AdminUserController {
             @RequestBody AdminUserUpdateRequestDto dto
     ) {
         adminUserService.updateUserInfo(userId, dto);
+        return ResponseEntity.ok().build();
+    }
+
+    // 비밀번호 수정
+    @PatchMapping("/{userId}/password")
+    public ResponseEntity<Void> updateUserPassword(
+            @PathVariable Long userId,
+            @RequestBody AdminPasswordUpdateRequestDto dto
+    ) {
+        adminUserService.updateUserPassword(userId, dto);
         return ResponseEntity.ok().build();
     }
 }

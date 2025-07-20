@@ -1,9 +1,6 @@
 package com.example.moyeorak.service.admin;
 
-import com.example.moyeorak.dto.admin.AdminUserCreateRequestDto;
-import com.example.moyeorak.dto.admin.AdminUserDetailResponseDto;
-import com.example.moyeorak.dto.admin.AdminUserListResponseDto;
-import com.example.moyeorak.dto.admin.AdminUserUpdateRequestDto;
+import com.example.moyeorak.dto.admin.*;
 import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
 import com.example.moyeorak.jwt.JwtProvider;
@@ -178,6 +175,22 @@ public class AdminUserService {
                     .orElseThrow(() -> new IllegalArgumentException("해당 지역이 존재하지 않습니다."));
             user.setRegion(region);
         }
+    }
+
+    // 비밀번호 변경
+    @Transactional
+    public void updateUserPassword(Long userId, AdminPasswordUpdateRequestDto dto) {
+        // 1. 유저 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
+
+        // 2. 새 비밀번호 확인
+        if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
+            throw new IllegalArgumentException("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
+        }
+
+        // 3. 비밀번호 업데이트
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
     }
 
 }
