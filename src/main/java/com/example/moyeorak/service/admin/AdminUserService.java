@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Service
@@ -94,13 +95,19 @@ public class AdminUserService {
         }
 
         // 3. 유저 생성
+
+        // null 체크 먼저
+        if (dto.getEmail() == null) {
+            throw new IllegalArgumentException("Email cannot be null.");
+        }
+
         User newUser = User.builder()
                 .email(dto.getEmail().trim().toLowerCase())
                 .password(passwordEncoder.encode(dto.getPassword()))
                 .name(dto.getName())
                 .gender(parseGender(dto.getGender()))
                 .phone(dto.getPhone())
-                .birth(LocalDate.parse(dto.getBirth())) // "2025-07-20" 형식
+                .birth(parseBirthDate(dto.getBirth()))
                 .role(User.Role.USER)
                 .region(region)
                 .build();
@@ -115,6 +122,14 @@ public class AdminUserService {
             case "여" -> User.Gender.FEMALE;
             default -> throw new IllegalArgumentException("성별은 '남' 또는 '여'여야 합니다.");
         };
+    }
+
+    private LocalDate parseBirthDate(String birth) {
+        try {
+            return LocalDate.parse(birth);  // yyyy-MM-dd 형식 기대
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("생년월일 형식이 잘못되었습니다: " + birth);
+        }
     }
 
     // 회원 상세정보 응답
