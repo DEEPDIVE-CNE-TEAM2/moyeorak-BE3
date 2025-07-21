@@ -36,7 +36,7 @@ public class AdminUserService {
                 .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
 
         if (admin.getRole() != User.Role.ADMIN) {
-            throw new IllegalAccessError("관리자 권한이 없습니다.");
+            throw new IllegalArgumentException("관리자 권한이 없습니다.");
         }
 
         // 3. 조회할 지역 결정
@@ -126,7 +126,7 @@ public class AdminUserService {
         User admin = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
         if (admin.getRole() != User.Role.ADMIN) {
-            throw new IllegalAccessError("관리자 권한이 없습니다.");
+            throw new IllegalArgumentException("관리자 권한이 없습니다.");
         }
 
         // 2. 유저 조회
@@ -135,7 +135,7 @@ public class AdminUserService {
 
         // 3. 유저가 관리자 담당 지역 유저인지 검증
         if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new IllegalAccessError("관리자 담당 지역 유저가 아닙니다.");
+            throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
         }
 
         // 4. 응답 DTO 구성
