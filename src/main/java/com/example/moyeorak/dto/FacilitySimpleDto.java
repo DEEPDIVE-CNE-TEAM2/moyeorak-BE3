@@ -12,7 +12,7 @@ public class FacilitySimpleDto {
     private String location;
     private String address;
     private String usageTime;
-    private Integer capacity;
+    private String contact;
     private String imageUrl;
     private Integer area;
 }

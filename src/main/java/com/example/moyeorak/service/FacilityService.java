@@ -61,7 +61,7 @@ public class FacilityService {
                         .location(facility.getName())
                         .address(facility.getAddress())
                         .usageTime(formatUsageTime(facility))
-                        .capacity(facility.getCapacity())
+                        .contact(facility.getContact())
                         .imageUrl(facility.getImageUrl())
                         .area(facility.getArea())
                         .build())
