@@ -163,6 +163,7 @@ public class EnrollmentService {
                 .classEndTime(program.getClassEndTime())
                 .instructorName(program.getInstructorName())
                 .regionLabel(regionLabel)
+                .cancelEndDate(program.getCancelEndDate())
                 .build();
     }
 }
