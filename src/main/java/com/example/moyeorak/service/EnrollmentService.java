@@ -37,7 +37,9 @@ public class EnrollmentService {
         Program program = programRepository.findById(request.getProgramId())
                 .orElseThrow(() -> new IllegalArgumentException("프로그램 정보가 없습니다."));
 
-        if (enrollmentRepository.existsByUserIdAndProgramId(user.getId(), program.getId())) {
+        // ✅ 중복 수강 신청 체크 (CANCELLED 제외)
+        if (enrollmentRepository.existsByUserIdAndProgramIdAndStatusNot(
+                user.getId(), program.getId(), Enrollment.Status.CANCELLED)) {
             throw new IllegalArgumentException("이미 신청한 프로그램입니다.");
         }
 
