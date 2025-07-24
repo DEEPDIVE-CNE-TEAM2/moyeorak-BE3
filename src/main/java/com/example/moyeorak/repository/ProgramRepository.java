@@ -10,14 +10,16 @@ import java.util.Optional;
 
 public interface ProgramRepository extends JpaRepository<Program, Long> {
 
-    Optional<Program> findByTitleAndFacility_LocationAndUsageStartDateAndUsageEndDateAndClassStartTimeAndClassEndTime(
+    // ✅ 프로그램 중복 체크용 - Facility의 name을 기준으로 검색
+    Optional<Program> findByTitleAndFacility_NameAndUsageStartDateAndUsageEndDateAndClassStartTimeAndClassEndTime(
             String title,
-            String facilityLocation,
+            String facilityName,
             LocalDate usageStartDate,
             LocalDate usageEndDate,
             LocalTime classStartTime,
             LocalTime classEndTime
     );
 
+    // ✅ 지역별 프로그램 목록 조회
     List<Program> findByRegion_Id(Long regionId);
 }

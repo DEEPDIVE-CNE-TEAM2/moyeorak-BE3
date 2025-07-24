@@ -26,9 +26,10 @@ public class Program {
     @JoinColumn(name = "region_id", nullable = false)
     private Region region;
 
+    // ✅ Rental → Facility 로 변경
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "facility_id", nullable = false)
-    private Rental facility;
+    private Facility facility;
 
     @Column(length = 50, nullable = false)
     private String category;

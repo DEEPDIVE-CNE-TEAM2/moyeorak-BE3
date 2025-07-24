@@ -21,21 +21,20 @@ public class ProgramService {
 
     private final ProgramRepository programRepository;
     private final RegionRepository regionRepository;
-    private final RentalRepository rentalRepository;
+    private final FacilityRepository facilityRepository;
     private final UserRepository userRepository;
 
     @Transactional
     public ProgramDisplayResponse createProgram(ProgramRequest dto) {
-        log.info("[CREATE] 프로그램 등록 요청: {}", dto);
+        log.info("[CREATE] 추가 등록: {}", dto);
         validateDuplicateTitle(dto.getTitle());
-
         Program program = buildProgramFromDto(dto);
         return toDisplayResponse(programRepository.save(program), null);
     }
 
     public List<ProgramDisplayResponse> getAllPrograms(Long userId) {
         User user = getUser(userId);
-        log.info("[GET] 전체 프로그램 목록 조회 - userId: {}", userId);
+        log.info("[GET] 전체 공정 목록 - userId: {}", userId);
         return programRepository.findAll().stream()
                 .map(p -> toDisplayResponse(p, user))
                 .toList();
@@ -43,7 +42,7 @@ public class ProgramService {
 
     public List<ProgramDisplayResponse> getProgramsByRegion(Long regionId, Long userId) {
         User user = getUser(userId);
-        log.info("[GET] 지역별 프로그램 목록 조회 - regionId: {}, userId: {}", regionId, userId);
+        log.info("[GET] 지역 별 공정 목록 - regionId: {}, userId: {}", regionId, userId);
         return programRepository.findByRegion_Id(regionId).stream()
                 .map(p -> toDisplayResponse(p, user))
                 .toList();
@@ -51,13 +50,13 @@ public class ProgramService {
 
     public ProgramDisplayResponse getProgramById(Long id, Long userId) {
         User user = getUser(userId);
-        log.info("[GET] 프로그램 상세 조회 - ID: {}, userId: {}", id, userId);
+        log.info("[GET] 공정 상세 조회 - ID: {}, userId: {}", id, userId);
         return toDisplayResponse(getProgram(id), user);
     }
 
     @Transactional
     public ProgramDisplayResponse partialUpdateProgram(Long id, Map<String, Object> updates) {
-        log.info("[PATCH] 프로그램 부분 수정 - ID: {}", id);
+        log.info("[PATCH] 공정 부분 수정 - ID: {}", id);
         Program program = getProgram(id);
 
         Set<String> allowedFields = Set.of(
@@ -69,15 +68,12 @@ public class ProgramService {
 
         updates.forEach((fieldName, value) -> {
             if (!allowedFields.contains(fieldName)) return;
-
             try {
                 switch (fieldName) {
                     case "regionId" -> program.setRegion(getRegion(Long.parseLong(value.toString())));
                     case "facilityId" -> program.setFacility(getFacility(Long.parseLong(value.toString())));
-                    case "status" -> program.setStatus(
-                            "closed".equalsIgnoreCase(value.toString()) ? Program.Status.CLOSED : Program.Status.OPEN);
-                    case "usageStartDate", "usageEndDate",
-                         "registrationStartDate", "registrationEndDate", "cancelEndDate" -> {
+                    case "status" -> program.setStatus("closed".equalsIgnoreCase(value.toString()) ? Program.Status.CLOSED : Program.Status.OPEN);
+                    case "usageStartDate", "usageEndDate", "registrationStartDate", "registrationEndDate", "cancelEndDate" -> {
                         Field field = Program.class.getDeclaredField(fieldName);
                         field.setAccessible(true);
                         field.set(program, LocalDate.parse(value.toString()));
@@ -106,27 +102,27 @@ public class ProgramService {
 
     @Transactional
     public MessageResponse deleteProgram(Long id) {
-        log.info("[DELETE] 프로그램 삭제 - ID: {}", id);
+        log.info("[DELETE] 공정 삭제 - ID: {}", id);
 
         if (!programRepository.existsById(id)) {
-            throw new IllegalArgumentException("삭제할 프로그램이 존재하지 않습니다.");
+            throw new IllegalArgumentException("삭제할 공정이 없습니다.");
         }
 
         programRepository.deleteById(id);
-        return new MessageResponse("프로그램이 삭제되었습니다.");
+        return new MessageResponse("공정이 삭제되었습니다.");
     }
 
     private void validateDuplicateTitle(String title) {
         boolean exists = programRepository.findAll().stream()
                 .anyMatch(program -> program.getTitle().equalsIgnoreCase(title));
         if (exists) {
-            throw new IllegalArgumentException("이미 존재하는 프로그램 제목입니다.");
+            throw new IllegalArgumentException("이미 존재하는 공정 제목입니다.");
         }
     }
 
     private Program getProgram(Long id) {
         return programRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("프로그램(ID: " + id + ")이 존재하지 않습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("공정(ID: " + id + ")이 존재하지 않습니다."));
     }
 
     private Region getRegion(Long regionId) {
@@ -134,8 +130,8 @@ public class ProgramService {
                 .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + regionId + ")이 존재하지 않습니다."));
     }
 
-    private Rental getFacility(Long facilityId) {
-        return rentalRepository.findById(Math.toIntExact(facilityId))
+    private Facility getFacility(Long facilityId) {
+        return facilityRepository.findById(facilityId)
                 .orElseThrow(() -> new IllegalArgumentException("시설(ID: " + facilityId + ")이 존재하지 않습니다."));
     }
 
@@ -184,13 +180,19 @@ public class ProgramService {
 
         inRegion = Objects.equals(userRegionId, programRegionId);
 
-        log.info("관내 여부 판단: userRegionId = {}, programRegionId = {}, inRegion = {}",
-                userRegionId, programRegionId, inRegion);
+        // ✅ 불일치 여부 로그로 확인
+        if (program.getFacility() != null && program.getFacility().getRegion() != null && program.getRegion() != null) {
+            Long facilityRegionId = program.getFacility().getRegion().getId();
+            if (!facilityRegionId.equals(programRegionId)) {
+                log.warn("[불일치] 프로그램과 시설의 지역ID 다름 - programId: {}, program.regionId: {}, facility.regionId: {}",
+                        program.getId(), programRegionId, facilityRegionId);
+            }
+        }
 
         return ProgramDisplayResponse.builder()
                 .id(program.getId())
                 .title(program.getTitle())
-                .location(program.getFacility().getLocation())
+                .location(program.getFacility().getName())
                 .target(program.getTarget())
                 .usagePeriod(formatDateRange(program.getUsageStartDate(), program.getUsageEndDate()))
                 .classTime(formatTimeRange(program.getClassStartTime(), program.getClassEndTime()))

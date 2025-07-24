@@ -4,9 +4,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
-//import io.awspring.cloud.messaging.core.SqsTemplate;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Configuration
 public class SQSConfig {
@@ -19,13 +20,16 @@ public class SQSConfig {
     public SqsAsyncClient sqsAsyncClient() {
         return SqsAsyncClient.builder()
                 .region(Region.of(region))
+                .credentialsProvider(ProfileCredentialsProvider.create("sqs-user"))
                 .build();
     }
 
-    // SQS 템플릿
-    //@Bean
-    //public SqsTemplate sqsTemplate(SqsAsyncClient sqsAsyncClient) {
-    //    return SqsTemplate.newTemplate(sqsAsyncClient);
-    //}
+    @Bean
+    public SqsClient sqsClient() {
+        return SqsClient.builder()
+                .region(Region.of(region))
+                .credentialsProvider(ProfileCredentialsProvider.create("sqs-user"))
+                .build();
+    }
 
 }

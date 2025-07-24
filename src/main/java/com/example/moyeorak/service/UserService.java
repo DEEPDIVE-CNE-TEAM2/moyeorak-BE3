@@ -41,13 +41,16 @@ public class UserService {
         User.Role role = dto.getRoleOrDefault();
 
         Region region = null;
-        if (role == User.Role.USER) {
-            if (dto.getRegionId() == null) {
-                throw new IllegalArgumentException("일반 사용자는 지역을 반드시 선택해야 합니다.");
-            }
 
+        // ✅ 관리자든 유저든 regionId가 있다면 처리
+        if (dto.getRegionId() != null) {
             region = regionRepository.findById(dto.getRegionId())
                     .orElseThrow(() -> new IllegalArgumentException("선택한 지역이 존재하지 않습니다."));
+        }
+
+        // ✅ 일반 사용자는 지역 필수
+        if (role == User.Role.USER && region == null) {
+            throw new IllegalArgumentException("일반 사용자는 지역을 반드시 선택해야 합니다.");
         }
 
         User user = User.builder()

@@ -38,12 +38,15 @@ public class SecurityConfig {
                                 "/api/rentals/region/**",
                                 "/api/rentals/facilities/region/**",
                                 "/api/programs", "/api/programs/{id}",
+                                "/api/facilities/{id:[\\d]+}",
+                                "/api/facilities/region/{regionId:[\\d]+}",
                                 "/api/main-images/region/**",
                                 "/api/notices/region/**",
                                 "/api/notices/{id}",
                                 "/swagger-ui/**", "/swagger-ui.html",
                                 "/v3/api-docs/**", "/v3/api-docs.yaml"
                         ).permitAll()
+                        .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
