@@ -35,6 +35,7 @@ public class SecurityConfig {
                                 "/api/users/check-email", "/api/users/check-phone",
                                 "/api/regions/**",
                                 "/api/programs/region/**",
+                                "/api/users/refresh",
                                 "/api/rentals/region/**",
                                 "/api/rentals/facilities/region/**",
                                 "/api/programs", "/api/programs/{id}",

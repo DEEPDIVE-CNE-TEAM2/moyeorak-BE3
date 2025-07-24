@@ -37,14 +37,45 @@ public class UserController {
         return ResponseEntity.ok(userService.signup(dto));
     }
 
-    // 🔐 로그인
+    // 🔐 로그인 - refreshToken 저장 포함
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody UserLoginRequestDto dto) {
-        return ResponseEntity.ok(userService.login(dto));
+        User user = userService.getUserByEmail(dto.getEmail());
+
+        if (!userService.verifyPassword(user.getEmail(), dto.getPassword())) {
+            return ResponseEntity.status(401).body(new LoginResponseDto("비밀번호가 틀렸습니다.", null, null));
+        }
+
+        String accessToken = jwtProvider.generateToken(user.getEmail(), user.getRole().name());
+        String refreshToken = jwtProvider.generateRefreshToken(user.getEmail());
+
+        // 🔐 refreshToken 저장
+        userService.updateRefreshToken(user.getEmail(), refreshToken);
+
+        return ResponseEntity.ok(new LoginResponseDto("로그인 완료", "Bearer " + accessToken, refreshToken));
     }
 
-    // 🔐 비밀번호 검증 (수정 페이지 접근 전)
-    @Operation(summary = "비밀번호 확인", description = "회원 정보 수정 전에 비밀번호를 검증합니다.")
+    // ♻️ 토큰 재발급
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> tokenMap) {
+        String refreshToken = tokenMap.get("refreshToken");
+
+        if (!jwtProvider.validateToken(refreshToken)) {
+            return ResponseEntity.status(401).body(Map.of("message", "Refresh Token이 유효하지 않습니다."));
+        }
+
+        String email = jwtProvider.getEmail(refreshToken);
+        User user = userService.getUserByEmail(email);
+
+        if (!refreshToken.equals(user.getRefreshToken())) {
+            return ResponseEntity.status(401).body(Map.of("message", "Refresh Token이 일치하지 않습니다."));
+        }
+
+        String newAccessToken = jwtProvider.generateToken(email, user.getRole().name());
+        return ResponseEntity.ok(Map.of("accessToken", "Bearer " + newAccessToken));
+    }
+
+    // 🔐 비밀번호 검증
     @PostMapping("/verify-password")
     public ResponseEntity<PasswordVerifyResponseDto> verifyPassword(
             HttpServletRequest request,
@@ -110,26 +141,6 @@ public class UserController {
     public ResponseEntity<Map<String, Boolean>> checkPhoneDuplicate(@RequestParam String phone) {
         boolean isDuplicate = userService.isPhoneDuplicate(phone.trim());
         return ResponseEntity.ok(Map.of("isDuplicate", isDuplicate));
-    }
-
-    // ♻️ 토큰 재발급
-    @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestBody Map<String, String> tokenMap) {
-        String refreshToken = tokenMap.get("refreshToken");
-
-        if (!jwtProvider.validateToken(refreshToken)) {
-            return ResponseEntity.status(401).body(Map.of("message", "Refresh Token이 유효하지 않습니다."));
-        }
-
-        String email = jwtProvider.getEmail(refreshToken);
-        User user = userService.getUserByEmail(email);
-
-        if (!refreshToken.equals(user.getRefreshToken())) {
-            return ResponseEntity.status(401).body(Map.of("message", "Refresh Token이 일치하지 않습니다."));
-        }
-
-        String newAccessToken = jwtProvider.generateToken(email, user.getRole().name());
-        return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
     }
 
     // 👑 전체 사용자 조회 (관리자용)
