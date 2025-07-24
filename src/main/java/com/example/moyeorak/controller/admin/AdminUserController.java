@@ -1,11 +1,12 @@
 package com.example.moyeorak.controller.admin;
 import com.example.moyeorak.dto.admin.AdminUserDetailResponseDto;
-
+import com.example.moyeorak.dto.admin.AdminUserEnrollmentDto;
 import com.example.moyeorak.dto.admin.AdminUserCreateRequestDto;
 import com.example.moyeorak.dto.admin.AdminUserListResponseDto;
 import com.example.moyeorak.dto.admin.AdminUserUpdateRequestDto;
 import com.example.moyeorak.dto.admin.AdminPasswordUpdateRequestDto;
 import com.example.moyeorak.service.admin.AdminUserService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,10 @@ public class AdminUserController {
     private final AdminUserService adminUserService;
 
     // AccessToken 기반으로 관리자 유저 식별, null이면 자기 지역 값 있으면 그 지역 뜨게
+    @Operation(
+            summary = "회원 조회",
+            description = "관리자가 회원 조회, ?regionId=지역id&keyword=이름"
+    )
     @GetMapping
     public List<AdminUserListResponseDto> getUsersByRegionAndKeyword(
             @RequestParam(required = false) Long regionId,
@@ -31,6 +36,9 @@ public class AdminUserController {
     }
 
     // 유저 생성
+    @Operation(
+            summary = "유저 생성"
+    )
     @PostMapping
     public ResponseEntity<Void> createUser(
             @RequestBody AdminUserCreateRequestDto dto,
@@ -41,6 +49,9 @@ public class AdminUserController {
     }
 
     // 회원 상세 정보 조회
+    @Operation(
+            summary = "회원 상세 정보 조회"
+    )
     @GetMapping("/{userId}")
     public ResponseEntity<AdminUserDetailResponseDto> getUserDetail(
             @PathVariable Long userId,
@@ -51,6 +62,9 @@ public class AdminUserController {
     }
 
     // 회원정보수정
+    @Operation(
+            summary = "회원정보 수정"
+    )
     @PatchMapping("/{userId}")
     public ResponseEntity<Void> updateUserInfo(
             @PathVariable Long userId,
@@ -61,6 +75,9 @@ public class AdminUserController {
     }
 
     // 비밀번호 수정
+    @Operation(
+            summary = "회원 비밀번호 수정"
+    )
     @PatchMapping("/{userId}/password")
     public ResponseEntity<Void> updateUserPassword(
             @PathVariable Long userId,
@@ -68,5 +85,22 @@ public class AdminUserController {
     ) {
         adminUserService.updateUserPassword(userId, dto);
         return ResponseEntity.ok().build();
+    }
+
+    // 유저 수강 이력 조회
+    @Operation(summary = "회원 수강 이력 조회")
+    @GetMapping("/{userId}/enrollments")
+    public ResponseEntity<List<AdminUserEnrollmentDto>> getUserEnrollments(
+            @PathVariable Long userId
+    ) {
+        return ResponseEntity.ok(adminUserService.getUserEnrollments(userId));
+    }
+
+    // 유저 수강 이력 취소
+    @Operation(summary = "회원 수강 삭제")
+    @DeleteMapping("/enrollments/{enrollmentId}")
+    public ResponseEntity<String> cancelEnrollment(@PathVariable Long enrollmentId) {
+        adminUserService.cancelEnrollment(enrollmentId);
+        return ResponseEntity.ok("수강 신청이 성공적으로 취소되었습니다.");
     }
 }

@@ -1,11 +1,15 @@
 package com.example.moyeorak.service.admin;
 
 import com.example.moyeorak.dto.admin.*;
+import com.example.moyeorak.entity.Enrollment;
+import com.example.moyeorak.entity.Program;
 import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
 import com.example.moyeorak.jwt.JwtProvider;
+import com.example.moyeorak.repository.EnrollmentRepository;
 import com.example.moyeorak.repository.UserRepository;
 import com.example.moyeorak.repository.RegionRepository;
+import com.example.moyeorak.repository.ProgramRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +29,9 @@ public class AdminUserService {
     private final JwtProvider jwtProvider;
     private final RegionRepository regionRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ProgramRepository programRepository;
+    private final EnrollmentRepository enrollmentRepository;
+
 
     // 토큰 기반으로 관리자 식별 + 담당 지역 유저 조회 (키워드 필터링 포함)
     public List<AdminUserListResponseDto> getUsersByRegionAndKeyword(HttpServletRequest request, Long regionId, String keyword) {
@@ -208,4 +215,43 @@ public class AdminUserService {
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
     }
 
+    public List<AdminUserEnrollmentDto> getUserEnrollments(Long userId) {
+        // 1. 유저 존재 여부 확인
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
+
+        // 2. 수강 이력 가져오기
+        List<Enrollment> enrollments = enrollmentRepository.findAllWithProgramAndRegionByUserId(userId);
+
+        // 3. DTO로 변환
+        return enrollments.stream()
+                .map(enrollment -> AdminUserEnrollmentDto.builder()
+                        .enrollmentId(enrollment.getId())
+                        .programTitle(enrollment.getProgram().getTitle())
+                        .appliedDate(enrollment.getEnrolledAt().toLocalDate().toString())
+                        .regionName(enrollment.getRegion().getName())
+                        .status(enrollment.getStatus().name())
+                        .canCancel(   //수강중이면서 프로그램 상태 OPEN일때만 버튼 활성화
+                                enrollment.getStatus() == Enrollment.Status.ENROLLED &&
+                                        enrollment.getProgram().getStatus() == Program.Status.OPEN
+                        )
+                        .build())
+                .toList();
+    }
+
+    @Transactional
+    public void cancelEnrollment(Long enrollmentId) {
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 수강신청이 존재하지 않습니다."));
+
+        if (enrollment.getStatus() != Enrollment.Status.ENROLLED) {
+            throw new IllegalStateException("이미 취소되었거나 수강중 상태가 아닙니다.");
+        }
+
+        if (enrollment.getProgram().getStatus() == Program.Status.CLOSED) {
+            throw new IllegalStateException("종료된 프로그램은 취소할 수 없습니다.");
+        }
+
+        enrollment.setStatus(Enrollment.Status.CANCELLED);
+    }
 }
