@@ -1,6 +1,6 @@
 package com.example.moyeorak.controller.admin;
 import com.example.moyeorak.dto.admin.AdminUserDetailResponseDto;
-
+import com.example.moyeorak.dto.admin.AdminUserEnrollmentDto;
 import com.example.moyeorak.dto.admin.AdminUserCreateRequestDto;
 import com.example.moyeorak.dto.admin.AdminUserListResponseDto;
 import com.example.moyeorak.dto.admin.AdminUserUpdateRequestDto;
@@ -85,5 +85,22 @@ public class AdminUserController {
     ) {
         adminUserService.updateUserPassword(userId, dto);
         return ResponseEntity.ok().build();
+    }
+
+    // 유저 수강 이력 조회
+    @Operation(summary = "회원 수강 이력 조회")
+    @GetMapping("/{userId}/enrollments")
+    public ResponseEntity<List<AdminUserEnrollmentDto>> getUserEnrollments(
+            @PathVariable Long userId
+    ) {
+        return ResponseEntity.ok(adminUserService.getUserEnrollments(userId));
+    }
+
+    // 유저 수강 이력 취소
+    @Operation(summary = "회원 수강 삭제")
+    @DeleteMapping("/enrollments/{enrollmentId}")
+    public ResponseEntity<String> cancelEnrollment(@PathVariable Long enrollmentId) {
+        adminUserService.cancelEnrollment(enrollmentId);
+        return ResponseEntity.ok("수강 신청이 성공적으로 취소되었습니다.");
     }
 }
