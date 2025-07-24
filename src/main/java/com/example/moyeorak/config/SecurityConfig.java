@@ -1,6 +1,7 @@
 package com.example.moyeorak.config;
 
 import com.example.moyeorak.jwt.JwtAuthFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,13 +29,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // Preflight 허용
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/actuator/health", "/actuator/info", "/health",
                                 "/api/users/signup", "/api/users/login",
                                 "/api/users/check-email", "/api/users/check-phone",
                                 "/api/regions/**",
                                 "/api/programs/region/**",
+                                "/api/users/refresh",
                                 "/api/rentals/region/**",
                                 "/api/rentals/facilities/region/**",
                                 "/api/programs", "/api/programs/{id}",
@@ -48,6 +50,14 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다.");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "접근 권한이 없습니다.");
+                        })
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

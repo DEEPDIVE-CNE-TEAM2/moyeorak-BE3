@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,27 +42,8 @@ public class EnrollmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 없습니다."));
 
-        String[] dateParts = request.getUsagePeriod().split(" ~ ");
-        String[] timeParts = request.getClassTime().split(" ~ ");
-
-        if (dateParts.length != 2 || timeParts.length != 2) {
-            throw new IllegalArgumentException("기간 또는 시간이 올바르지 않습니다.");
-        }
-
-        LocalDate usageStartDate = LocalDate.parse(dateParts[0].trim());
-        LocalDate usageEndDate = LocalDate.parse(dateParts[1].trim());
-        LocalTime classStartTime = LocalTime.parse(timeParts[0].trim());
-        LocalTime classEndTime = LocalTime.parse(timeParts[1].trim());
-
-        Program program = programRepository
-                .findByTitleAndFacility_NameAndUsageStartDateAndUsageEndDateAndClassStartTimeAndClassEndTime(
-                        request.getProgramTitle(),
-                        request.getLocation(),
-                        usageStartDate,
-                        usageEndDate,
-                        classStartTime,
-                        classEndTime
-                ).orElseThrow(() -> new IllegalArgumentException("프로그램 정보를 찾을 수 없습니다."));
+        Program program = programRepository.findById(request.getProgramId())
+                .orElseThrow(() -> new IllegalArgumentException("프로그램 정보가 없습니다."));
 
         if (enrollmentRepository.existsByUserIdAndProgramId(user.getId(), program.getId())) {
             throw new IllegalArgumentException("이미 신청한 프로그램입니다.");
@@ -171,6 +151,7 @@ public class EnrollmentService {
                 .classEndTime(program.getClassEndTime())
                 .instructorName(program.getInstructorName())
                 .regionLabel(regionLabel)
+                .cancelEndDate(program.getCancelEndDate())
                 .build();
     }
 

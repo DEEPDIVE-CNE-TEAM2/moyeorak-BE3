@@ -97,17 +97,24 @@ public class ProgramService {
             }
         });
 
+        // ✅ 지역-시설 일치 여부 검증
+        if (program.getRegion() != null && program.getFacility() != null) {
+            Long regionId = program.getRegion().getId();
+            Long facilityRegionId = program.getFacility().getRegion().getId();
+            if (!Objects.equals(regionId, facilityRegionId)) {
+                throw new IllegalArgumentException("선택한 시설이 해당 지역에 속하지 않습니다.");
+            }
+        }
+
         return toDisplayResponse(program, null);
     }
 
     @Transactional
     public MessageResponse deleteProgram(Long id) {
         log.info("[DELETE] 공정 삭제 - ID: {}", id);
-
         if (!programRepository.existsById(id)) {
             throw new IllegalArgumentException("삭제할 공정이 없습니다.");
         }
-
         programRepository.deleteById(id);
         return new MessageResponse("공정이 삭제되었습니다.");
     }
@@ -142,10 +149,18 @@ public class ProgramService {
     }
 
     private Program buildProgramFromDto(ProgramRequest dto) {
+        Region region = getRegion(dto.getRegionId());
+        Facility facility = getFacility(dto.getFacilityId());
+
+        // ✅ 지역-시설 일치 여부 검증
+        if (!Objects.equals(region.getId(), facility.getRegion().getId())) {
+            throw new IllegalArgumentException("선택한 시설이 해당 지역에 속하지 않습니다.");
+        }
+
         return Program.builder()
                 .title(dto.getTitle())
-                .region(getRegion(dto.getRegionId()))
-                .facility(getFacility(dto.getFacilityId()))
+                .region(region)
+                .facility(facility)
                 .category(dto.getCategory())
                 .target(dto.getTarget())
                 .instructorName(dto.getInstructorName())
@@ -180,7 +195,7 @@ public class ProgramService {
 
         inRegion = Objects.equals(userRegionId, programRegionId);
 
-        // ✅ 불일치 여부 로그로 확인
+        // ✅ 불일치 로그 출력
         if (program.getFacility() != null && program.getFacility().getRegion() != null && program.getRegion() != null) {
             Long facilityRegionId = program.getFacility().getRegion().getId();
             if (!facilityRegionId.equals(programRegionId)) {

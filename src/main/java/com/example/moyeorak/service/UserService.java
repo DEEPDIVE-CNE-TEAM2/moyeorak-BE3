@@ -39,16 +39,13 @@ public class UserService {
         validateDuplicatePhone(phone);
 
         User.Role role = dto.getRoleOrDefault();
-
         Region region = null;
 
-        // ✅ 관리자든 유저든 regionId가 있다면 처리
         if (dto.getRegionId() != null) {
             region = regionRepository.findById(dto.getRegionId())
                     .orElseThrow(() -> new IllegalArgumentException("선택한 지역이 존재하지 않습니다."));
         }
 
-        // ✅ 일반 사용자는 지역 필수
         if (role == User.Role.USER && region == null) {
             throw new IllegalArgumentException("일반 사용자는 지역을 반드시 선택해야 합니다.");
         }
@@ -74,7 +71,8 @@ public class UserService {
                 .build();
     }
 
-    // ✅ 로그인
+    // ✅ 로그인 - refreshToken 저장 및 반환 포함
+    @Transactional
     public LoginResponseDto login(UserLoginRequestDto dto) {
         User user = userRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이메일입니다."));
@@ -87,8 +85,17 @@ public class UserService {
         String refreshToken = jwtProvider.generateRefreshToken(user.getEmail());
 
         user.setRefreshToken(refreshToken);
+        userRepository.save(user); // ⬅️ refreshToken 저장!
 
         return new LoginResponseDto("로그인 완료", "Bearer " + accessToken, refreshToken);
+    }
+
+    // ✅ refreshToken 저장 (재발급용)
+    @Transactional
+    public void updateRefreshToken(String email, String refreshToken) {
+        User user = getUserByEmail(email);
+        user.setRefreshToken(refreshToken);
+        userRepository.save(user);
     }
 
     // ✅ 내 정보 조회
@@ -99,10 +106,10 @@ public class UserService {
 
     // ✅ 내 정보 수정
     @Transactional
-    public UserResponseDto updateUserInfo(String emailFromToken, UserUpdateRequestDto dto) {
-        log.info("[UserService] 사용자 정보 수정 요청: {}", emailFromToken);
+    public UserResponseDto updateUserInfo(String email, UserUpdateRequestDto dto) {
+        log.info("[UserService] 사용자 정보 수정 요청: {}", email);
 
-        User user = getUserByEmail(emailFromToken);
+        User user = getUserByEmail(email);
 
         updateIfChanged(dto.getEmail(), user.getEmail(), newEmail -> {
             validateDuplicateEmail(newEmail);
@@ -120,7 +127,6 @@ public class UserService {
             user.setGender(dto.getGender());
         }
 
-        // ✅ 지역 ID로 지역 변경 처리
         updateIfChanged(dto.getRegionId(), user.getRegion() != null ? user.getRegion().getId() : null, newRegionId -> {
             Region region = regionRepository.findById(newRegionId)
                     .orElseThrow(() -> new IllegalArgumentException("선택한 지역이 존재하지 않습니다."));
@@ -128,12 +134,6 @@ public class UserService {
         });
 
         return UserResponseDto.fromEntity(user);
-    }
-
-    private void updateIfChanged(Long newValue, Long currentValue, Consumer<Long> updater) {
-        if (newValue != null && !newValue.equals(currentValue)) {
-            updater.accept(newValue);
-        }
     }
 
     // ✅ 비밀번호 변경
@@ -175,13 +175,13 @@ public class UserService {
                 .toList();
     }
 
-    // ✅ 비밀번호 검증 (verify-password용)
+    // ✅ 비밀번호 검증
     public boolean verifyPassword(String email, String password) {
         User user = getUserByEmail(email);
         return passwordEncoder.matches(password, user.getPassword());
     }
 
-    // ✅ 중복 확인
+    // ✅ 중복 체크
     public boolean isEmailDuplicate(String email) {
         return userRepository.findByEmail(email.trim().toLowerCase()).isPresent();
     }
@@ -196,14 +196,20 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
     }
 
-    // ✅ 수정 시 필드 변경 감지 (String용)
+    // ✅ 필드 변경 감지 유틸
     private void updateIfChanged(String newValue, String currentValue, Consumer<String> updater) {
         if (newValue != null && !newValue.equals(currentValue)) {
             updater.accept(newValue);
         }
     }
 
-    // ✅ 중복 체크 유틸
+    private void updateIfChanged(Long newValue, Long currentValue, Consumer<Long> updater) {
+        if (newValue != null && !newValue.equals(currentValue)) {
+            updater.accept(newValue);
+        }
+    }
+
+    // ✅ 중복 유틸
     private void validateDuplicateEmail(String email) {
         if (isEmailDuplicate(email)) {
             throw new IllegalArgumentException("이미 존재하는 이메일입니다.");

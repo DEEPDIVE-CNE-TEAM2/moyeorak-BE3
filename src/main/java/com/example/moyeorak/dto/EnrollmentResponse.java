@@ -2,6 +2,7 @@ package com.example.moyeorak.dto;
 
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -23,6 +24,7 @@ public class EnrollmentResponse {
     private LocalTime classStartTime;
     private LocalTime classEndTime;
     private String instructorName;
-    private String regionLabel;  // ✅ "관내" or "관외"
+    private String regionLabel;
+    private LocalDate cancelEndDate;
 }
 
