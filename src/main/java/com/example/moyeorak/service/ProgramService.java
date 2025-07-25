@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 
@@ -146,6 +147,27 @@ public class ProgramService {
         if (userId == null) return null;
         return userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 없습니다."));
+    }
+
+    public boolean isAsyncPeriod(Long programId) {
+        Program program = programRepository.findById(programId)
+                .orElseThrow(() -> new IllegalArgumentException("프로그램을 찾을 수 없습니다."));
+
+        LocalDate registrationDate = program.getRegistrationStartDate();
+        if (registrationDate == null) {
+            log.warn("[isAsyncPeriod] registration_start_date가 null입니다. programId={}", programId);
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = registrationDate.atTime(9, 0);
+        LocalDateTime end = registrationDate.atTime(10, 0);
+
+        boolean result = now.isAfter(start) && now.isBefore(end);
+        log.info("[isAsyncPeriod] programId={}, now={}, start={}, end={}, isAsync={}",
+                programId, now, start, end, result);
+
+        return result;
     }
 
     private Program buildProgramFromDto(ProgramRequest dto) {
