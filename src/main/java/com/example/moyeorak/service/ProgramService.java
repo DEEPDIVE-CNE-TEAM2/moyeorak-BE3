@@ -12,6 +12,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Slf4j
@@ -24,6 +25,7 @@ public class ProgramService {
     private final RegionRepository regionRepository;
     private final FacilityRepository facilityRepository;
     private final UserRepository userRepository;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Transactional
     public ProgramDisplayResponse createProgram(ProgramRequest dto) {
@@ -159,9 +161,9 @@ public class ProgramService {
             return false;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KST);
         LocalDateTime start = registrationDate.atTime(9, 0);
-        LocalDateTime end = registrationDate.atTime(10, 0);
+        LocalDateTime end = registrationDate.atTime(12, 0);
 
         boolean result = now.isAfter(start) && now.isBefore(end);
         log.info("[isAsyncPeriod] programId={}, now={}, start={}, end={}, isAsync={}",
