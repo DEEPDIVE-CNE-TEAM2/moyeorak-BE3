@@ -9,17 +9,10 @@ import com.example.moyeorak.entity.User;
 import com.example.moyeorak.repository.EnrollmentRepository;
 import com.example.moyeorak.repository.ProgramRepository;
 import com.example.moyeorak.repository.UserRepository;
-import com.example.moyeorak.security.CustomUserDetails;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -45,10 +38,15 @@ public class EnrollmentService {
         Program program = programRepository.findById(request.getProgramId())
                 .orElseThrow(() -> new IllegalArgumentException("프로그램 정보가 없습니다."));
 
-        // ✅ 중복 수강 신청 체크 (CANCELLED 제외)
-        if (enrollmentRepository.existsByUserIdAndProgramIdAndStatusNot(
-                user.getId(), program.getId(), Enrollment.Status.CANCELLED)) {
-            throw new IllegalArgumentException("이미 신청한 프로그램입니다.");
+        // ✅ 중복 수강 신청 체크 및 재신청 허용 로직
+        Optional<Enrollment> existing = enrollmentRepository.findByUserIdAndProgramId(user.getId(), program.getId());
+
+        if (existing.isPresent()) {
+            Enrollment prev = existing.get();
+            if (prev.getStatus() != Enrollment.Status.CANCELLED) {
+                throw new IllegalArgumentException("이미 신청한 프로그램입니다.");
+            }
+            enrollmentRepository.delete(prev); // ✅ 취소된 신청이면 삭제 후 진행
         }
 
         boolean inRegion = isInRegion(user, program);
@@ -156,5 +154,4 @@ public class EnrollmentService {
                 .cancelEndDate(program.getCancelEndDate())
                 .build();
     }
-
 }
