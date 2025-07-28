@@ -1,5 +1,6 @@
 package com.example.moyeorak.controller.admin;
 
+import com.example.moyeorak.dto.admin.AdminProgramCreateRequest;
 import com.example.moyeorak.dto.admin.AdminProgramListResponse;
 import com.example.moyeorak.service.admin.AdminProgramService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,6 +29,17 @@ public class AdminProgramController {
     ) {
         List<AdminProgramListResponse> programs = adminProgramService.getProgramsByRegionAndTitle(request, regionId, title);
         return ResponseEntity.ok(programs);
+    }
+
+
+    @PostMapping
+    @Operation(summary = "관리자 프로그램 등록", description = "응답값 programid")
+    public ResponseEntity<Long> createProgram(
+            @RequestBody AdminProgramCreateRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        Long programId = adminProgramService.createProgram(request, httpRequest);
+        return ResponseEntity.status(201).body(programId);
     }
 
 }

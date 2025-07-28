@@ -1,14 +1,13 @@
 package com.example.moyeorak.service.admin;
 
+import com.example.moyeorak.dto.admin.AdminProgramCreateRequest;
 import com.example.moyeorak.dto.admin.AdminProgramListResponse;
+import com.example.moyeorak.entity.Facility;
 import com.example.moyeorak.entity.Program;
 import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
 import com.example.moyeorak.jwt.JwtProvider;
-import com.example.moyeorak.repository.EnrollmentRepository;
-import com.example.moyeorak.repository.ProgramRepository;
-import com.example.moyeorak.repository.RegionRepository;
-import com.example.moyeorak.repository.UserRepository;
+import com.example.moyeorak.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -27,6 +27,8 @@ public class AdminProgramService {
     private final JwtProvider jwtProvider;
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
+    private final FacilityRepository facilityRepository;
+
 
 
 
@@ -94,5 +96,55 @@ public class AdminProgramService {
         if (today.isBefore(start)) return "수업 예정";
         else if (!today.isAfter(end)) return "진행중";
         else return "수업 종료";
+    }
+
+
+    @Transactional
+    public Long createProgram(AdminProgramCreateRequest request, HttpServletRequest httpRequest) {
+        // 1. 관리자 인증
+        String token = jwtProvider.resolveToken(httpRequest);
+        String email = jwtProvider.getEmail(token);
+        User admin = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
+        if (admin.getRole() != User.Role.ADMIN) {
+            throw new IllegalArgumentException("관리자 권한이 없습니다.");
+        }
+
+        // 2. 지역과 시설 조회 + 일치 여부 검증
+        Region region = regionRepository.findById(request.getRegionId())
+                .orElseThrow(() -> new IllegalArgumentException("지역 정보가 없습니다."));
+        Facility facility = facilityRepository.findById(request.getFacilityId())
+                .orElseThrow(() -> new IllegalArgumentException("시설 정보가 없습니다."));
+        if (!facility.getRegion().getId().equals(region.getId())) {
+            throw new IllegalArgumentException("선택한 시설이 해당 지역에 속하지 않습니다.");
+        }
+
+        // 3. 프로그램 엔티티 생성
+        Program program = Program.builder()
+                .title(request.getTitle())
+                .region(region)
+                .facility(facility)
+                .category(request.getCategory())
+                .target(request.getTarget())
+                .instructorName(request.getInstructorName())
+                .status("CLOSED".equalsIgnoreCase(request.getStatus()) ? Program.Status.CLOSED : Program.Status.OPEN)
+                .usageStartDate(request.getUsageStartDate())
+                .usageEndDate(request.getUsageEndDate())
+                .classStartTime(request.getClassStartTime())
+                .classEndTime(request.getClassEndTime())
+                .registrationStartDate(request.getRegistrationStartDate())
+                .registrationEndDate(request.getRegistrationEndDate())
+                .cancelEndDate(request.getCancelEndDate())
+                .inPrice(request.getInPrice())
+                .outPrice(request.getOutPrice())
+                .capacity(request.getCapacity())
+                .contact(request.getContact())
+                .imageUrl(request.getImageUrl())
+                .description(request.getDescription())
+                .build();
+
+        // 4. 저장 후 ID 반환
+        Program saved = programRepository.save(program);
+        return saved.getId();
     }
 }
