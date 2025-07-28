@@ -3,6 +3,7 @@ package com.example.moyeorak.service.admin;
 import com.example.moyeorak.dto.admin.AdminProgramCreateRequest;
 import com.example.moyeorak.dto.admin.AdminProgramDetailResponse;
 import com.example.moyeorak.dto.admin.AdminProgramListResponse;
+import com.example.moyeorak.dto.admin.AdminProgramUpdateRequest;
 import com.example.moyeorak.entity.Facility;
 import com.example.moyeorak.entity.Program;
 import com.example.moyeorak.entity.Region;
@@ -33,20 +34,12 @@ public class AdminProgramService {
 
 
 
-
+    // 프로그램 리스트 조회
     public List<AdminProgramListResponse> getProgramsByRegionAndTitle(HttpServletRequest request, Long regionId, String title) {
-        // 1. 토큰 → 관리자 이메일
-        String token = jwtProvider.resolveToken(request);
-        String email = jwtProvider.getEmail(token);
+        // 1. 관리자 검증
+        User admin = getAdminFromRequest(request);
 
-        // 2. 관리자 유저 확인
-        User admin = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
-        if (admin.getRole() != User.Role.ADMIN) {
-            throw new IllegalArgumentException("관리자 권한이 없습니다.");
-        }
-
-        // 3. 조회할 지역 결정
+        // 2. 조회할 지역 결정
         Region targetRegion;
         if (regionId == null) {
             targetRegion = admin.getRegion();
@@ -58,7 +51,7 @@ public class AdminProgramService {
                     .orElseThrow(() -> new IllegalArgumentException("해당 지역이 존재하지 않습니다."));
         }
 
-        // 4. 조건에 맞는 프로그램 조회
+        // 3. 조건에 맞는 프로그램 조회
         List<Program> programs;
         if (title == null || title.trim().isEmpty()) {
             programs = programRepository.findByRegion(targetRegion);
@@ -66,7 +59,7 @@ public class AdminProgramService {
             programs = programRepository.findByRegionAndTitleContainingIgnoreCase(targetRegion, title.trim());
         }
 
-        // 5. DTO 변환
+        // 4. DTO 변환
         return programs.stream()
                 .map(this::toAdminListDto)
                 .toList();
@@ -87,30 +80,12 @@ public class AdminProgramService {
                 .build();
     }
 
-    // 날짜 "YYYY-MM-DD ~ YYYY-MM-DD" 포맷팅
-    private String formatDateRange(LocalDate start, LocalDate end) {
-        return start + " ~ " + end;
-    }
 
-    // 오늘 날짜 기준으로 수업 상태 판단: 수업 예정 / 진행중 / 수업 종료
-    private String getProgressStatus(LocalDate start, LocalDate end) {
-        LocalDate today = LocalDate.now();
-        if (today.isBefore(start)) return "수업 예정";
-        else if (!today.isAfter(end)) return "진행중";
-        else return "수업 종료";
-    }
-
-
+    // 프로그램 생성
     @Transactional
     public Long createProgram(AdminProgramCreateRequest request, HttpServletRequest httpRequest) {
         // 1. 관리자 인증
-        String token = jwtProvider.resolveToken(httpRequest);
-        String email = jwtProvider.getEmail(token);
-        User admin = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
-        if (admin.getRole() != User.Role.ADMIN) {
-            throw new IllegalArgumentException("관리자 권한이 없습니다.");
-        }
+        User admin = getAdminFromRequest(httpRequest);
 
         // 2. 지역과 시설 조회 + 일치 여부 검증
         Region region = regionRepository.findById(request.getRegionId())
@@ -177,8 +152,83 @@ public class AdminProgramService {
                 .build();
     }
 
+
+    // 프로그램 수정
+    @Transactional
+    public Long patchProgram(Long programId, AdminProgramUpdateRequest request, HttpServletRequest httpRequest) {
+        User admin = getAdminFromRequest(httpRequest);
+
+        Program program = programRepository.findById(programId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로그램이 존재하지 않습니다."));
+
+        // 값 있는 것만 덮어쓰기
+        if (request.getTitle() != null) program.setTitle(request.getTitle());
+        if (request.getCategory() != null) program.setCategory(request.getCategory());
+        if (request.getTarget() != null) program.setTarget(request.getTarget());
+        if (request.getInstructorName() != null) program.setInstructorName(request.getInstructorName());
+        if (request.getStatus() != null)
+            program.setStatus("CLOSED".equalsIgnoreCase(request.getStatus()) ? Program.Status.CLOSED : Program.Status.OPEN);
+        if (request.getUsageStartDate() != null) program.setUsageStartDate(request.getUsageStartDate());
+        if (request.getUsageEndDate() != null) program.setUsageEndDate(request.getUsageEndDate());
+        if (request.getClassStartTime() != null) program.setClassStartTime(request.getClassStartTime());
+        if (request.getClassEndTime() != null) program.setClassEndTime(request.getClassEndTime());
+        if (request.getRegistrationStartDate() != null) program.setRegistrationStartDate(request.getRegistrationStartDate());
+        if (request.getRegistrationEndDate() != null) program.setRegistrationEndDate(request.getRegistrationEndDate());
+        if (request.getCancelEndDate() != null) program.setCancelEndDate(request.getCancelEndDate());
+        if (request.getInPrice() != null) program.setInPrice(request.getInPrice());
+        if (request.getOutPrice() != null) program.setOutPrice(request.getOutPrice());
+        if (request.getCapacity() != null) program.setCapacity(request.getCapacity());
+        if (request.getContact() != null) program.setContact(request.getContact());
+        if (request.getImageUrl() != null) program.setImageUrl(request.getImageUrl());
+        if (request.getDescription() != null) program.setDescription(request.getDescription());
+
+        if (request.getFacilityId() != null) {
+            Facility facility = facilityRepository.findById(request.getFacilityId())
+                    .orElseThrow(() -> new IllegalArgumentException("시설 정보가 없습니다."));
+
+            // 기존 지역과 시설 지역이 다르면 거부
+            if (!facility.getRegion().getId().equals(program.getRegion().getId())) {
+                throw new IllegalArgumentException("선택한 시설(" + facility.getName() + ")은 현재 지역에 속하지 않습니다.");
+            }
+
+            program.setFacility(facility);
+        }
+
+        return program.getId();
+    }
+
+
+
     // 시간 포매팅
     private String formatTimeRange(LocalTime start, LocalTime end) {
         return start + " ~ " + end;
     }
+
+    // 유저 관리자 검증
+    private User getAdminFromRequest(HttpServletRequest request) {
+        String token = jwtProvider.resolveToken(request);
+        String email = jwtProvider.getEmail(token);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
+        if (user.getRole() != User.Role.ADMIN) {
+            throw new IllegalArgumentException("관리자 권한이 없습니다.");
+        }
+        return user;
+    }
+
+    // 날짜 "YYYY-MM-DD ~ YYYY-MM-DD" 포맷팅
+    private String formatDateRange(LocalDate start, LocalDate end) {
+        return start + " ~ " + end;
+    }
+
+    // 오늘 날짜 기준으로 수업 상태 판단: 수업 예정 / 진행중 / 수업 종료
+    private String getProgressStatus(LocalDate start, LocalDate end) {
+        LocalDate today = LocalDate.now();
+        if (today.isBefore(start)) return "수업 예정";
+        else if (!today.isAfter(end)) return "진행중";
+        else return "수업 종료";
+    }
+
+
+
 }

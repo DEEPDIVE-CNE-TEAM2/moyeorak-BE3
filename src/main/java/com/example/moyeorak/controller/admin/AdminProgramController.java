@@ -1,9 +1,6 @@
 package com.example.moyeorak.controller.admin;
 
-import com.example.moyeorak.dto.admin.AdminProgramCreateRequest;
-import com.example.moyeorak.dto.admin.AdminProgramDetailResponse;
-import com.example.moyeorak.dto.admin.AdminProgramListResponse;
-import com.example.moyeorak.dto.admin.AdminUserDetailResponseDto;
+import com.example.moyeorak.dto.admin.*;
 import com.example.moyeorak.service.admin.AdminProgramService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,5 +49,16 @@ public class AdminProgramController {
     ) {
         AdminProgramDetailResponse userDetail = adminProgramService.getProgramDetail(programId);
         return ResponseEntity.ok(userDetail);
+    }
+
+    @PatchMapping("/{programId}")
+    @Operation(summary = "관리자 프로그램 수정", description = "변경하고 싶은 필드만 보내도됨 지역 변경 불가")
+    public ResponseEntity<Long> patchProgram(
+            @PathVariable Long programId,
+            @RequestBody AdminProgramUpdateRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        Long updatedId = adminProgramService.patchProgram(programId, request, httpRequest);
+        return ResponseEntity.ok(updatedId);
     }
 }
