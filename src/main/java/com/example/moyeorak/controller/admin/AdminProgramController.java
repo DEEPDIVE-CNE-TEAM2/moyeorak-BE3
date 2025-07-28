@@ -48,8 +48,8 @@ public class AdminProgramController {
             @PathVariable Long programId,
             HttpServletRequest request
     ) {
-        AdminProgramDetailResponse userDetail = adminProgramService.getProgramDetail(programId);
-        return ResponseEntity.ok(userDetail);
+        AdminProgramDetailResponse programDetail = adminProgramService.getProgramDetail(programId);
+        return ResponseEntity.ok(programDetail);
     }
 
     @PatchMapping("/{programId}")
