@@ -1,7 +1,9 @@
 package com.example.moyeorak.controller.admin;
 
 import com.example.moyeorak.dto.admin.AdminProgramCreateRequest;
+import com.example.moyeorak.dto.admin.AdminProgramDetailResponse;
 import com.example.moyeorak.dto.admin.AdminProgramListResponse;
+import com.example.moyeorak.dto.admin.AdminUserDetailResponseDto;
 import com.example.moyeorak.service.admin.AdminProgramService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,4 +44,13 @@ public class AdminProgramController {
         return ResponseEntity.status(201).body(programId);
     }
 
+    @GetMapping("/{programId}")
+    @Operation(summary = "관리자 프로그램 상세 조회")
+    public ResponseEntity<AdminProgramDetailResponse> getProgramDetail(
+            @PathVariable Long programId,
+            HttpServletRequest request
+    ) {
+        AdminProgramDetailResponse userDetail = adminProgramService.getProgramDetail(programId);
+        return ResponseEntity.ok(userDetail);
+    }
 }

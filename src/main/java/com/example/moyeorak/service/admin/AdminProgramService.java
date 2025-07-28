@@ -1,6 +1,7 @@
 package com.example.moyeorak.service.admin;
 
 import com.example.moyeorak.dto.admin.AdminProgramCreateRequest;
+import com.example.moyeorak.dto.admin.AdminProgramDetailResponse;
 import com.example.moyeorak.dto.admin.AdminProgramListResponse;
 import com.example.moyeorak.entity.Facility;
 import com.example.moyeorak.entity.Program;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
@@ -146,5 +148,37 @@ public class AdminProgramService {
         // 4. 저장 후 ID 반환
         Program saved = programRepository.save(program);
         return saved.getId();
+    }
+
+    // 프로그램 상세 조회
+    public AdminProgramDetailResponse getProgramDetail(Long programId) {
+        Program program = programRepository.findById(programId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로그램이 존재하지 않습니다."));
+
+        return AdminProgramDetailResponse.builder()
+                .id(program.getId())
+                .title(program.getTitle())
+                .regionName(program.getRegion().getName())
+                .facilityName(program.getFacility().getName())
+                .category(program.getCategory())
+                .target(program.getTarget())
+                .instructorName(program.getInstructorName())
+                .status(program.getStatus().name())
+                .usagePeriod(formatDateRange(program.getUsageStartDate(), program.getUsageEndDate()))
+                .classTime(formatTimeRange(program.getClassStartTime(), program.getClassEndTime()))
+                .registrationPeriod(formatDateRange(program.getRegistrationStartDate(), program.getRegistrationEndDate()))
+                .cancelEndDate(program.getCancelEndDate().toString())
+                .inPrice(program.getInPrice())
+                .outPrice(program.getOutPrice())
+                .capacity(program.getCapacity())
+                .contact(program.getContact())
+                .imageUrl(program.getImageUrl())
+                .description(program.getDescription())
+                .build();
+    }
+
+    // 시간 포매팅
+    private String formatTimeRange(LocalTime start, LocalTime end) {
+        return start + " ~ " + end;
     }
 }
