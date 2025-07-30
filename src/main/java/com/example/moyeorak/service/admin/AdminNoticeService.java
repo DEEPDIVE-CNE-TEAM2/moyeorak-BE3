@@ -1,0 +1,58 @@
+package com.example.moyeorak.service.admin;
+
+import com.example.moyeorak.dto.NoticeResponse;
+import com.example.moyeorak.dto.admin.AdminNoticeRequest;
+import com.example.moyeorak.dto.admin.AdminNoticeResponse;
+import com.example.moyeorak.entity.Notice;
+import com.example.moyeorak.entity.Region;
+import com.example.moyeorak.entity.User;
+import com.example.moyeorak.jwt.JwtProvider;
+import com.example.moyeorak.repository.NoticeRepository;
+import com.example.moyeorak.repository.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class AdminNoticeService {
+
+    private final UserRepository userRepository;
+    private final NoticeRepository noticeRepository;
+    private final JwtProvider jwtProvider;
+
+    // 공지사항 생성
+    @Transactional
+    public AdminNoticeResponse createNotice(AdminNoticeRequest dto, HttpServletRequest request) {
+        // 1. 관리자 인증
+        User admin = getAuthenticatedAdmin(request);
+
+        // 2. 지역 조회
+        Region region = admin.getRegion();
+
+        // 3. 공지사항 엔티티 생성
+        Notice notice = Notice.builder()
+                .title(dto.getTitle())
+                .content(dto.getContent())
+                .author(admin)
+                .region(region)
+                .build();
+
+        return AdminNoticeResponse.from(noticeRepository.save(notice));
+    }
+
+    // 유저 관리자 검증
+    public User getAuthenticatedAdmin(HttpServletRequest request) {
+        String token = jwtProvider.resolveToken(request);
+        String email = jwtProvider.getEmail(token);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
+
+        if (user.getRole() != User.Role.ADMIN) {
+            throw new IllegalArgumentException("관리자 권한이 없습니다.");
+        }
+        return user;
+    }
+}
