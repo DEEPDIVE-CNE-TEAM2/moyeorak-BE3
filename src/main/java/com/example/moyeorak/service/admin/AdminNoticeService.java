@@ -88,6 +88,20 @@ public class AdminNoticeService {
         return AdminNoticeResponse.from(notice);
     }
 
+    @Transactional
+    public void deleteNotice(Long noticeId, HttpServletRequest request) {
+        User admin = getAuthenticatedAdmin(request);
+
+        Notice notice = noticeRepository.findById(noticeId)
+                .orElseThrow(() -> new IllegalArgumentException("공지사항이 존재하지 않습니다."));
+
+        if (!notice.getAuthor().equals(admin)) {
+            throw new IllegalArgumentException("본인이 작성한 공지만 삭제할 수 있습니다.");
+        }
+
+        noticeRepository.delete(notice);
+    }
+
     // 유저 관리자 검증
     public User getAuthenticatedAdmin(HttpServletRequest request) {
         String token = jwtProvider.resolveToken(request);

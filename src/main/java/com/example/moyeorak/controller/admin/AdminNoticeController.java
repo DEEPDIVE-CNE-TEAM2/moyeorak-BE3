@@ -64,4 +64,14 @@ public class AdminNoticeController {
         AdminNoticeResponse response = adminNoticeService.updateNotice(noticeId, request, httpRequest);
         return ResponseEntity.ok(response);
     }
+
+    @Operation(summary = "공지사항 삭제")
+    @DeleteMapping("/{noticeId}")
+    public ResponseEntity<Void> deleteNotice(
+            @PathVariable Long noticeId,
+            HttpServletRequest request
+    ) {
+        adminNoticeService.deleteNotice(noticeId, request);
+        return ResponseEntity.noContent().build();
+    }
 }
