@@ -1,6 +1,7 @@
 package com.example.moyeorak.service.admin;
 
 import com.example.moyeorak.dto.NoticeResponse;
+import com.example.moyeorak.dto.admin.AdminNoticeListResponse;
 import com.example.moyeorak.dto.admin.AdminNoticeRequest;
 import com.example.moyeorak.dto.admin.AdminNoticeResponse;
 import com.example.moyeorak.entity.Notice;
@@ -13,6 +14,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +45,19 @@ public class AdminNoticeService {
 
         return AdminNoticeResponse.from(noticeRepository.save(notice));
     }
+
+    // 관리자 공지사항 리스트 조회
+    @Transactional(readOnly = true)
+    public List<AdminNoticeListResponse> getNoticeList(HttpServletRequest request) {
+        User admin = getAuthenticatedAdmin(request);
+        Region region = admin.getRegion();
+
+        return noticeRepository.findByRegion(region).stream()
+                .map(AdminNoticeListResponse::from)
+                .collect(Collectors.toList());
+    }
+
+
 
     // 유저 관리자 검증
     public User getAuthenticatedAdmin(HttpServletRequest request) {
