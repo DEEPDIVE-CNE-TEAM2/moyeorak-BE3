@@ -43,4 +43,25 @@ public class AdminNoticeController {
     ) {
         return adminNoticeService.getNoticeList(request);
     }
+
+    @Operation(summary = "공지사항 상세 조회")
+    @GetMapping("/{noticeId}")
+    public ResponseEntity<AdminNoticeResponse> getNoticeDetail(
+            @PathVariable Long noticeId,
+            HttpServletRequest request
+    ) {
+        AdminNoticeResponse response = adminNoticeService.getNoticeDetail(noticeId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "공지사항 수정")
+    @PutMapping("/{noticeId}")
+    public ResponseEntity<AdminNoticeResponse> updateNotice(
+            @PathVariable Long noticeId,
+            @Valid @RequestBody AdminNoticeRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        AdminNoticeResponse response = adminNoticeService.updateNotice(noticeId, request, httpRequest);
+        return ResponseEntity.ok(response);
+    }
 }

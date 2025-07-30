@@ -57,7 +57,36 @@ public class AdminNoticeService {
                 .collect(Collectors.toList());
     }
 
+    // 관리자 공지사항 상세보기
+    @Transactional(readOnly = true)
+    public AdminNoticeResponse getNoticeDetail(Long noticeId, HttpServletRequest request) {
+        User admin = getAuthenticatedAdmin(request);
+        Notice notice = noticeRepository.findById(noticeId)
+                .orElseThrow(() -> new IllegalArgumentException("공지사항이 존재하지 않습니다."));
 
+        return AdminNoticeResponse.from(notice);
+    }
+
+    // 공지사항 수정하기
+    @Transactional
+    public AdminNoticeResponse updateNotice(
+            Long noticeId,
+            AdminNoticeRequest dto,
+            HttpServletRequest request
+    ) {
+        User admin = getAuthenticatedAdmin(request);
+        Notice notice = noticeRepository.findById(noticeId)
+                .orElseThrow(() -> new IllegalArgumentException("공지사항이 존재하지 않습니다."));
+
+        if (!notice.getAuthor().equals(admin)) {
+            throw new IllegalArgumentException("수정 권한이 없습니다.");
+        }
+
+        notice.setTitle(dto.getTitle());
+        notice.setContent(dto.getContent());
+
+        return AdminNoticeResponse.from(notice);
+    }
 
     // 유저 관리자 검증
     public User getAuthenticatedAdmin(HttpServletRequest request) {
