@@ -24,9 +24,16 @@ public class FacilityService {
     private final FacilityRepository facilityRepository;
     private final RegionRepository regionRepository;
 
+    private static final String S3_BASE_URL = "https://s3-goorm-frontend.s3.ap-northeast-2.amazonaws.com/img/";
+
     private String formatUsageTime(Facility facility) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
         return facility.getUsageStartTime().format(formatter) + " ~ " + facility.getUsageEndTime().format(formatter);
+    }
+
+    private String fullImageUrl(String fileName) {
+        if (fileName == null || fileName.isBlank()) return null;
+        return S3_BASE_URL + fileName;
     }
 
     @Transactional
@@ -39,7 +46,7 @@ public class FacilityService {
                 .address(dto.getAddress())
                 .location(dto.getLocation())
                 .contact(dto.getContact())
-                .imageUrl(dto.getImageUrl())
+                .imageUrl(dto.getImageUrl())  // 저장은 파일명만
                 .capacity(dto.getCapacity())
                 .description(dto.getDescription())
                 .area(dto.getArea())
@@ -62,7 +69,7 @@ public class FacilityService {
                         .address(facility.getAddress())
                         .usageTime(formatUsageTime(facility))
                         .contact(facility.getContact())
-                        .imageUrl(facility.getImageUrl())
+                        .imageUrl(fullImageUrl(facility.getImageUrl()))  // 절대경로 적용
                         .area(facility.getArea())
                         .build())
                 .collect(Collectors.toList());
@@ -79,7 +86,7 @@ public class FacilityService {
                 .address(facility.getAddress())
                 .usageTime(formatUsageTime(facility))
                 .capacity(facility.getCapacity())
-                .imageUrl(facility.getImageUrl())
+                .imageUrl(fullImageUrl(facility.getImageUrl()))  // 절대경로 적용
                 .description(facility.getDescription())
                 .contact(facility.getContact())
                 .build();
@@ -115,7 +122,7 @@ public class FacilityService {
                 .name(facility.getName())
                 .address(facility.getAddress())
                 .contact(facility.getContact())
-                .imageUrl(facility.getImageUrl())
+                .imageUrl(fullImageUrl(facility.getImageUrl()))  // 절대경로 적용
                 .capacity(facility.getCapacity())
                 .description(facility.getDescription())
                 .regionId(facility.getRegion().getId())

@@ -1,6 +1,7 @@
 package com.example.moyeorak.repository;
 
 import com.example.moyeorak.entity.Program;
+import com.example.moyeorak.entity.Region;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
@@ -22,4 +23,8 @@ public interface ProgramRepository extends JpaRepository<Program, Long> {
 
     // ✅ 지역별 프로그램 목록 조회
     List<Program> findByRegion_Id(Long regionId);
+
+    // 관리자 프로그램 조회 사용
+    List<Program> findByRegion(Region region);
+    List<Program> findByRegionAndTitleContainingIgnoreCase(Region region, String title);
 }

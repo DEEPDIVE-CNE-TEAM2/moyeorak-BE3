@@ -41,9 +41,11 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
-    implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.0.1")
+    implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.0.2")
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-sqs'
-    implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
+    //implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
+    //implementation 'io.awspring.cloud:spring-cloud-aws-messaging:3.1.0'
+
 
 }
 
