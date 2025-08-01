@@ -15,13 +15,14 @@ public class SQSConfig {
     @Value("${cloud.aws.region.static}")
     private String region;
 
-    // SQS Client
+    @Value("${aws.use.default-credentials:false}")
+    private boolean useDefaultCredentials;
+
     @Bean
     public SqsAsyncClient sqsAsyncClient() {
         return SqsAsyncClient.builder()
                 .region(Region.of(region))
-                .credentialsProvider(DefaultCredentialsProvider.create())
-                //.credentialsProvider(ProfileCredentialsProvider.create("sqs-user"))
+                .credentialsProvider(getCredentialsProvider())
                 .build();
     }
 
@@ -29,9 +30,15 @@ public class SQSConfig {
     public SqsClient sqsClient() {
         return SqsClient.builder()
                 .region(Region.of(region))
-                .credentialsProvider(DefaultCredentialsProvider.create())
-                //.credentialsProvider(ProfileCredentialsProvider.create("sqs-user"))
+                .credentialsProvider(getCredentialsProvider())
                 .build();
     }
 
+    private software.amazon.awssdk.auth.credentials.AwsCredentialsProvider getCredentialsProvider() {
+        if (useDefaultCredentials) {
+            return software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create();
+        } else {
+            return software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider.create("sqs-user");
+        }
+    }
 }
