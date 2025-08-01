@@ -1,6 +1,7 @@
 package com.example.moyeorak.repository;
 
 import com.example.moyeorak.entity.Facility;
+import com.example.moyeorak.entity.Region;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -16,4 +17,6 @@ public interface FacilityRepository extends JpaRepository<Facility, Long> {
 
     // 이름 일부로 검색 (like 검색)
     List<Facility> findByNameContaining(String keyword);
+
+    List<Facility> findByRegion(Region region);
 }

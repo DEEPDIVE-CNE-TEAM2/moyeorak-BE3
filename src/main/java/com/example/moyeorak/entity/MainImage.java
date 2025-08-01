@@ -52,5 +52,13 @@ public class MainImage {
         this.isActive = isActive;
     }
 
+    // 순서만 바꾸는 메소드
+    public void changeDisplayOrder(Integer displayOrder) {
+        this.displayOrder = displayOrder;
+    }
+    // 표시여부만 바꾸는 메소드
+    public void changeActiveStatus(boolean isActive) {
+        this.isActive = isActive;
+    }
 
 }
