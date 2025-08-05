@@ -9,6 +9,7 @@ import com.example.moyeorak.service.admin.AdminUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,11 +18,11 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/users")
+@Slf4j
 public class AdminUserController {
 
     private final AdminUserService adminUserService;
 
-    // AccessToken 기반으로 관리자 유저 식별, null이면 자기 지역 값 있으면 그 지역 뜨게
     @Operation(
             summary = "회원 조회",
             description = "관리자가 회원 조회, ?regionId=지역id&keyword=이름"
@@ -32,75 +33,85 @@ public class AdminUserController {
             @RequestParam(required = false) String keyword,
             HttpServletRequest request
     ) {
-        return adminUserService.getUsersByRegionAndKeyword(request, regionId, keyword);
+        log.info("[회원 조회] regionId={}, keyword={}", regionId, keyword);
+        List<AdminUserListResponseDto> result = adminUserService.getUsersByRegionAndKeyword(request, regionId, keyword);
+        log.info("[회원 조회] 결과 {}건", result.size());
+        return result;
     }
 
-    // 유저 생성
-    @Operation(
-            summary = "유저 생성"
-    )
+    @Operation(summary = "유저 생성")
     @PostMapping
     public ResponseEntity<Void> createUser(
             @RequestBody AdminUserCreateRequestDto dto,
             HttpServletRequest request
     ) {
+        log.info("[유저 생성] 요청 이름={}", dto.getName());
         adminUserService.createUser(dto, request);
+        log.info("[유저 생성] 완료");
         return ResponseEntity.ok().build();
     }
 
-    // 회원 상세 정보 조회
-    @Operation(
-            summary = "회원 상세 정보 조회"
-    )
+    @Operation(summary = "회원 상세 정보 조회")
     @GetMapping("/{userId}")
     public ResponseEntity<AdminUserDetailResponseDto> getUserDetail(
             @PathVariable Long userId,
             HttpServletRequest request
     ) {
+        log.info("[회원 상세 조회] userId={}", userId);
         AdminUserDetailResponseDto userDetail = adminUserService.getUserDetail(userId, request);
         return ResponseEntity.ok(userDetail);
     }
 
-    // 회원정보수정
-    @Operation(
-            summary = "회원정보 수정"
-    )
+    @Operation(summary = "회원정보 수정")
     @PatchMapping("/{userId}")
     public ResponseEntity<Void> updateUserInfo(
             @PathVariable Long userId,
-            @RequestBody AdminUserUpdateRequestDto dto
+            @RequestBody AdminUserUpdateRequestDto dto,
+            HttpServletRequest request
+
     ) {
-        adminUserService.updateUserInfo(userId, dto);
+        log.info("[회원정보 수정] userId={}", userId);
+        adminUserService.updateUserInfo(userId, dto, request);
+        log.info("[회원정보 수정] 완료 userId={}", userId);
         return ResponseEntity.ok().build();
     }
 
-    // 비밀번호 수정
     @Operation(
             summary = "회원 비밀번호 수정"
     )
     @PatchMapping("/{userId}/password")
     public ResponseEntity<Void> updateUserPassword(
             @PathVariable Long userId,
-            @RequestBody AdminPasswordUpdateRequestDto dto
+            @RequestBody AdminPasswordUpdateRequestDto dto,
+            HttpServletRequest request
     ) {
-        adminUserService.updateUserPassword(userId, dto);
+        log.info("[회원 비밀번호 수정] userId={}", userId);
+        adminUserService.updateUserPassword(userId, dto, request);
+        log.info("[회원 비밀번호 수정] 완료 userId={}", userId);
         return ResponseEntity.ok().build();
     }
 
-    // 유저 수강 이력 조회
     @Operation(summary = "회원 수강 이력 조회")
     @GetMapping("/{userId}/enrollments")
     public ResponseEntity<List<AdminUserEnrollmentDto>> getUserEnrollments(
-            @PathVariable Long userId
+            @PathVariable Long userId,
+            HttpServletRequest request
     ) {
-        return ResponseEntity.ok(adminUserService.getUserEnrollments(userId));
+        log.info("[수강 이력 조회] userId={}", userId);
+        List<AdminUserEnrollmentDto> enrollments = adminUserService.getUserEnrollments(userId, request);
+        log.info("[수강 이력 조회] 결과 {}건", enrollments.size());
+        return ResponseEntity.ok(enrollments);
     }
 
-    // 유저 수강 이력 취소
     @Operation(summary = "회원 수강 삭제")
     @DeleteMapping("/enrollments/{enrollmentId}")
-    public ResponseEntity<String> cancelEnrollment(@PathVariable Long enrollmentId) {
-        adminUserService.cancelEnrollment(enrollmentId);
+    public ResponseEntity<String> cancelEnrollment(
+            @PathVariable Long enrollmentId,
+            HttpServletRequest request
+    ) {
+        log.info("[수강 삭제] enrollmentId={}", enrollmentId);
+        adminUserService.cancelEnrollment(enrollmentId, request);
+        log.info("[수강 삭제] 완료 enrollmentId={}", enrollmentId);
         return ResponseEntity.ok("수강 신청이 성공적으로 취소되었습니다.");
     }
 }

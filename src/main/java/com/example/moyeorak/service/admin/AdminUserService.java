@@ -60,14 +60,7 @@ public class AdminUserService {
 
         // DTO 변환
         return users.stream()
-                .map(user -> new AdminUserListResponseDto(
-                        user.getId(),
-                        user.getName(),
-                        user.getGender().name(),
-                        user.getEmail(),
-                        user.getRegion().getName(),
-                        user.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
-                ))
+                .map(AdminUserListResponseDto::from)
                 .toList();
     }
 
@@ -83,11 +76,9 @@ public class AdminUserService {
             throw new IllegalStateException("관리자 지역 정보가 없습니다.");
         }
 
-        // 유저 생성
-
-        // null 체크 먼저
+        // 유저 생성 null 체크 먼저
         if (dto.getEmail() == null) {
-            throw new IllegalArgumentException("Email cannot be null.");
+            throw new IllegalArgumentException("이메일은 null일 수 없습니다.");
         }
 
         User newUser = User.builder()
@@ -101,11 +92,13 @@ public class AdminUserService {
                 .region(region)
                 .build();
 
-        // 저장
         userRepository.save(newUser);
     }
 
     private User.Gender parseGender(String gender) {
+        if (gender == null) {
+            throw new IllegalArgumentException("성별 정보가 null입니다.");
+        }
         return switch (gender.trim()) {
             case "남" -> User.Gender.MALE;
             case "여" -> User.Gender.FEMALE;
