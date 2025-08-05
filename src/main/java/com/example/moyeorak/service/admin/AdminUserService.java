@@ -10,6 +10,7 @@ import com.example.moyeorak.repository.EnrollmentRepository;
 import com.example.moyeorak.repository.UserRepository;
 import com.example.moyeorak.repository.RegionRepository;
 import com.example.moyeorak.repository.ProgramRepository;
+import com.example.moyeorak.security.AdminAuthHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -29,25 +30,15 @@ public class AdminUserService {
     private final JwtProvider jwtProvider;
     private final RegionRepository regionRepository;
     private final PasswordEncoder passwordEncoder;
-    private final ProgramRepository programRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final AdminAuthHelper adminAuthHelper;
 
 
     // 토큰 기반으로 관리자 식별 + 담당 지역 유저 조회 (키워드 필터링 포함)
     public List<AdminUserListResponseDto> getUsersByRegionAndKeyword(HttpServletRequest request, Long regionId, String keyword) {
-        // 1. 토큰에서 관리자 이메일 꺼내기
-        String token = jwtProvider.resolveToken(request);
-        String email = jwtProvider.getEmail(token);
+        User admin = adminAuthHelper.getAdminFromRequest(request);
 
-        // 2. 관리자 유저 조회
-        User admin = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
-
-        if (admin.getRole() != User.Role.ADMIN) {
-            throw new IllegalArgumentException("관리자 권한이 없습니다.");
-        }
-
-        // 3. 조회할 지역 결정
+        // 조회할 지역 결정
         Region targetRegion;
         if (regionId == null) {
             targetRegion = admin.getRegion();
@@ -59,7 +50,7 @@ public class AdminUserService {
                     .orElseThrow(() -> new IllegalArgumentException("해당 지역이 존재하지 않습니다."));
         }
 
-        // 4. 일반 유저만 조회 (관리자 제외) + 키워드 필터링
+        // 일반 유저만 조회 (관리자 제외) + 키워드 필터링
         List<User> users;
         if (keyword == null || keyword.trim().isEmpty()) {
             users = userRepository.findByRegionAndRole(targetRegion, User.Role.USER);
@@ -67,7 +58,7 @@ public class AdminUserService {
             users = userRepository.findByRegionAndRoleAndNameContainingIgnoreCase(targetRegion, User.Role.USER, keyword.trim());
         }
 
-        // 5. DTO 변환
+        // DTO 변환
         return users.stream()
                 .map(user -> new AdminUserListResponseDto(
                         user.getId(),
@@ -84,24 +75,15 @@ public class AdminUserService {
     // 관리자 지역 기반으로 해당 지역 유저 생성
     @Transactional
     public void createUser(AdminUserCreateRequestDto dto, HttpServletRequest request) {
-        // 1. 관리자 인증
-        String token = jwtProvider.resolveToken(request);
-        String email = jwtProvider.getEmail(token);
+        User admin = adminAuthHelper.getAdminFromRequest(request);
 
-        User admin = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
-
-        if (admin.getRole() != User.Role.ADMIN) {
-            throw new IllegalAccessError("관리자 권한이 없습니다.");
-        }
-
-        // 2. 관리자 지역 가져오기
+        // 관리자 지역 가져오기
         Region region = admin.getRegion();
         if (region == null) {
             throw new IllegalStateException("관리자 지역 정보가 없습니다.");
         }
 
-        // 3. 유저 생성
+        // 유저 생성
 
         // null 체크 먼저
         if (dto.getEmail() == null) {
@@ -119,7 +101,7 @@ public class AdminUserService {
                 .region(region)
                 .build();
 
-        // 4. 저장
+        // 저장
         userRepository.save(newUser);
     }
 
@@ -141,26 +123,18 @@ public class AdminUserService {
 
     // 회원 상세정보 응답
     public AdminUserDetailResponseDto getUserDetail(Long userId, HttpServletRequest request) {
-        // 1. 관리자 인증
-        String token = jwtProvider.resolveToken(request);
-        String email = jwtProvider.getEmail(token);
+        User admin = adminAuthHelper.getAdminFromRequest(request);
 
-        User admin = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
-        if (admin.getRole() != User.Role.ADMIN) {
-            throw new IllegalArgumentException("관리자 권한이 없습니다.");
-        }
-
-        // 2. 유저 조회
+        // 유저 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
 
-        // 3. 유저가 관리자 담당 지역 유저인지 검증
+        // 유저가 관리자 담당 지역 유저인지 검증
         if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
             throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
         }
 
-        // 4. 응답 DTO 구성
+        // 응답 DTO 구성
         return AdminUserDetailResponseDto.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -176,22 +150,23 @@ public class AdminUserService {
 
     // 회원정보 수정
     @Transactional
-    public void updateUserInfo(Long userId, AdminUserUpdateRequestDto dto) {
-        // 1. 유저 조회
+    public void updateUserInfo(Long userId, AdminUserUpdateRequestDto dto, HttpServletRequest request) {
+        User admin = adminAuthHelper.getAdminFromRequest(request);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
 
-        // 2. email 수정
+        // 지역 검증
+        if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
+        }
+
         if (dto.getEmail() != null) {
             user.setEmail(dto.getEmail());
         }
-
-        // 3. phone 수정
         if (dto.getPhone() != null) {
             user.setPhone(dto.getPhone());
         }
-
-        // 4. region 수정
         if (dto.getRegionId() != null) {
             Region region = regionRepository.findById(dto.getRegionId())
                     .orElseThrow(() -> new IllegalArgumentException("해당 지역이 존재하지 않습니다."));
@@ -201,29 +176,36 @@ public class AdminUserService {
 
     // 비밀번호 변경
     @Transactional
-    public void updateUserPassword(Long userId, AdminPasswordUpdateRequestDto dto) {
-        // 1. 유저 조회
+    public void updateUserPassword(Long userId, AdminPasswordUpdateRequestDto dto, HttpServletRequest request) {
+        User admin = adminAuthHelper.getAdminFromRequest(request);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
 
-        // 2. 새 비밀번호 확인
+        if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
+        }
+
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
             throw new IllegalArgumentException("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
         }
 
-        // 3. 비밀번호 업데이트
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
     }
 
-    public List<AdminUserEnrollmentDto> getUserEnrollments(Long userId) {
-        // 1. 유저 존재 여부 확인
+    // 수강 이력 조회
+    public List<AdminUserEnrollmentDto> getUserEnrollments(Long userId, HttpServletRequest request) {
+        User admin = adminAuthHelper.getAdminFromRequest(request);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
 
-        // 2. 수강 이력 가져오기
+        if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
+        }
+
         List<Enrollment> enrollments = enrollmentRepository.findAllWithProgramAndRegionByUserId(userId);
 
-        // 3. DTO로 변환
         return enrollments.stream()
                 .map(enrollment -> AdminUserEnrollmentDto.builder()
                         .enrollmentId(enrollment.getId())
@@ -231,7 +213,7 @@ public class AdminUserService {
                         .appliedDate(enrollment.getEnrolledAt().toLocalDate().toString())
                         .regionName(enrollment.getRegion().getName())
                         .status(enrollment.getStatus().name())
-                        .canCancel(   //수강중이면서 프로그램 상태 OPEN일때만 버튼 활성화
+                        .canCancel(
                                 enrollment.getStatus() == Enrollment.Status.ENROLLED &&
                                         enrollment.getProgram().getStatus() == Program.Status.OPEN
                         )
@@ -239,10 +221,17 @@ public class AdminUserService {
                 .toList();
     }
 
+    // 수강 취소
     @Transactional
-    public void cancelEnrollment(Long enrollmentId) {
+    public void cancelEnrollment(Long enrollmentId, HttpServletRequest request) {
+        User admin = adminAuthHelper.getAdminFromRequest(request);
+
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 수강신청이 존재하지 않습니다."));
+
+        if (!enrollment.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new IllegalArgumentException("관리자 담당 지역의 수강신청이 아닙니다.");
+        }
 
         if (enrollment.getStatus() != Enrollment.Status.ENROLLED) {
             throw new IllegalStateException("이미 취소되었거나 수강중 상태가 아닙니다.");
