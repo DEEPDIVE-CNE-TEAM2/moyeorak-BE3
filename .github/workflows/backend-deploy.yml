@@ -10,7 +10,7 @@ env:
   ECR_REPOSITORY: moyeorak
   ECS_CLUSTER: moyeorak-cluster
   ECS_SERVICE: goorm-task2-service-u3avic9z
-  ECS_TASK_DEF: ecs-task-definition.json
+  ECS_TASK_DEF: moyeorak-task
   CONTAINER_NAME: moyeorak-container
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      id-token: write       # OIDC용 (권한 남겨두셔도 무방)
+      id-token: write       # OIDC용
       contents: read
 
     steps:
