@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      id-token: write       # OIDC용
+      id-token: write
       contents: read
 
     steps:
@@ -54,7 +54,6 @@ jobs:
       - name: Build with Gradle (test skip)
         run: ./gradlew build -x test
 
-
       - name: Build and push Docker image to ECR
         uses: docker/build-push-action@v5
         with:
@@ -69,6 +68,16 @@ jobs:
             --query "taskDefinition" \
             --output json > task-def.json
 
+          # Remove read-only / non-reusable fields
+          jq 'del(
+            .taskDefinitionArn,
+            .revision,
+            .status,
+            .requiresAttributes,
+            .compatibilities,
+            .registeredAt,
+            .registeredBy
+          )' task-def.json > cleaned-task-def.json
 
       - name: Update ECS task definition with new image
         id: update-task-def
@@ -76,7 +85,7 @@ jobs:
           IMAGE="${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest"
           jq --arg IMAGE "$IMAGE" --arg NAME "$CONTAINER_NAME" \
             '.containerDefinitions[] |= if .name == $NAME then .image = $IMAGE else . end' \
-            task-def.json > new-task-def.json
+            cleaned-task-def.json > new-task-def.json
 
       - name: Register new ECS task definition
         id: register-task-def
