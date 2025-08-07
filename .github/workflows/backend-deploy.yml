@@ -107,5 +107,5 @@ jobs:
             --deployment-group-name moyeorak-codedeploy-group \
             --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
             --revision revisionType=AppSpecContent,appSpecContent={content="$(awk '{printf "%s\\n", $0}' rendered-appspec.yml)"} \
-            --deployment-style deploymentType=BLUE_GREEN,deploymentOption=WITH_TRAFFIC_CONTROL \
             --file-exists-behavior OVERWRITE
+
