@@ -119,5 +119,5 @@ jobs:
 
           aws elbv2 modify-listener \
             --listener-arn $LISTENER_ARN \
-            --default-actions Type=forward,ForwardConfig="{TargetGroups=[{TargetGroupArn=$TARGET_GROUP_BLUE,Weight=100},{TargetGroupArn=$TARGET_GROUP_GREEN,Weight=0}]}"
+            --default-actions '[{"Type":"forward","ForwardConfig":{"TargetGroups":[{"TargetGroupArn":"'"$TARGET_GROUP_BLUE"'", "Weight":100},{"TargetGroupArn":"'"$TARGET_GROUP_GREEN"'", "Weight":0}]}}]'
 
