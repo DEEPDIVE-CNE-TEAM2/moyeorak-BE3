@@ -100,6 +100,16 @@ jobs:
         run: |
           sed "s|REPLACE_ME_TASK_DEF|$TASK_DEF_ARN|" appspec.yml > rendered-appspec.yml
 
+      - name: Reset listener rule before deployment #(Blue: 100%, Green: 0%)
+        run: |
+          LISTENER_ARN="arn:aws:elasticloadbalancing:ap-northeast-2:004407157704:listener/app/goorm-ALB/97aef8d1ebfd177e/88dc76dea2f047a6"
+          TARGET_GROUP_BLUE="arn:aws:elasticloadbalancing:ap-northeast-2:004407157704:targetgroup/ECS-Target-Group/94afaec22947e1ab"
+          TARGET_GROUP_GREEN="arn:aws:elasticloadbalancing:ap-northeast-2:004407157704:targetgroup/ECS-Target-Group-ALT/b12416d0f4e12b9b"
+
+          aws elbv2 modify-listener \
+            --listener-arn $LISTENER_ARN \
+            --default-actions '[{"Type":"forward","ForwardConfig":{"TargetGroups":[{"TargetGroupArn":"'"$TARGET_GROUP_BLUE"'", "Weight":100},{"TargetGroupArn":"'"$TARGET_GROUP_GREEN"'", "Weight":0}]}}]'
+
       - name: Create deployment
         id: create_deploy
         run: |
