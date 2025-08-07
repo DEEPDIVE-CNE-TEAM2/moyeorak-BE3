@@ -102,10 +102,14 @@ jobs:
 
       - name: Create deployment
         run: |
+          # rendered-appspec.yml
+          CONTENT=$(cat rendered-appspec.yml | jq -Rs .)
+
           aws deploy create-deployment \
             --application-name moyeorak-codedeploy-app \
             --deployment-group-name moyeorak-codedeploy-group \
             --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
-            --revision revisionType=AppSpecContent,appSpecContent={content="$(awk '{printf "%s\\n", $0}' rendered-appspec.yml)"} \
+            --revision revisionType=AppSpecContent,appSpecContent="{\"content\":$CONTENT}" \
             --file-exists-behavior OVERWRITE
+
 
