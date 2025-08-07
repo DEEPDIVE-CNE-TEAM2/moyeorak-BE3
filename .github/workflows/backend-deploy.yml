@@ -107,7 +107,7 @@ jobs:
             --application-name moyeorak-backend \
             --deployment-group-name moyeorak-backend-dg \
             --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
-            --revision "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":$CONTENT}}" \
-            --file-exists-behavior OVERWRITE
+            --revision "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":$CONTENT}}"
+
 
 
