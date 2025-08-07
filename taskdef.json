@@ -3,7 +3,7 @@
   "executionRoleArn": "arn:aws:iam::004407157704:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
-      "name": "moyeorak-container",
+      "name": "app-container",
       "image": "<IMAGE_URI>",
       "portMappings": [
         {

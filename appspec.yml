@@ -3,7 +3,7 @@ Resources:
   - TargetService:
       Type: AWS::ECS::Service
       Properties:
-        TaskDefinition: "REPLACE_ME_TASK_DEF"    # GitHub Actions에서 대체됨
+        TaskDefinition: "REPLACE_ME_TASK_DEF"  
         LoadBalancerInfo:
-          ContainerName: "moyeorak-container"
+          ContainerName: "app-container"
           ContainerPort: 8080
