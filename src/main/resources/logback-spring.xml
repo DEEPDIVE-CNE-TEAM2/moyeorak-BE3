@@ -1,0 +1,20 @@
+<configuration scan="true">
+    <!-- 콘솔 포맷 -->
+    <property name="COLOR_PATTERN"
+              value="%d{HH:mm:ss.SSS} %highlight([%level]) %highlight([%msg]) [%class{36}.%method:%line] [traceId=%X{traceId:--} userId=%X{userId:--} role=%X{role:--} reason=%X{reason:--} regionId=%X{regionId:--}]%n"/>
+
+    <!-- 콘솔 출력기 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder><pattern>${COLOR_PATTERN}</pattern></encoder>
+    </appender>
+
+    <!-- 나머지 로그는 warn 이상만 보이게 -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="com.example.moyeorak" level="INFO"/>
+
+    <!-- info까지 콘솔에 내보내게 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
