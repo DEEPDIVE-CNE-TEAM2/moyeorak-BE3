@@ -22,26 +22,25 @@ public class AdminNoticeController {
 
     private final AdminNoticeService adminNoticeService;
 
-    // 공지사항 생성
-    @Operation(
-            summary = "공지사항 생성"
-    )
+    @Operation(summary = "공지사항 생성")
     @PostMapping
     public ResponseEntity<AdminNoticeResponse> createNotice(
             @Valid @RequestBody AdminNoticeRequest request,
             HttpServletRequest httpRequest
     ) {
-
+        log.info("공지사항 생성 요청: title={}", request.getTitle());
         AdminNoticeResponse response = adminNoticeService.createNotice(request, httpRequest);
+        log.info("공지사항 생성 완료: noticeId={}", response.getId());
         return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "공지사항 조회")
     @GetMapping
-    public List<AdminNoticeListResponse> getNoticeList(
-            HttpServletRequest request
-    ) {
-        return adminNoticeService.getNoticeList(request);
+    public List<AdminNoticeListResponse> getNoticeList(HttpServletRequest request) {
+        log.info("공지사항 목록 조회 요청");
+        List<AdminNoticeListResponse> list = adminNoticeService.getNoticeList(request);
+        log.info("공지사항 목록 조회 완료: {}건", list.size());
+        return list;
     }
 
     @Operation(summary = "공지사항 상세 조회")
@@ -50,7 +49,9 @@ public class AdminNoticeController {
             @PathVariable Long noticeId,
             HttpServletRequest request
     ) {
+        log.info("공지사항 상세 조회 요청: noticeId={}", noticeId);
         AdminNoticeResponse response = adminNoticeService.getNoticeDetail(noticeId, request);
+        log.info("공지사항 상세 조회 완료: noticeId={}", noticeId);
         return ResponseEntity.ok(response);
     }
 
@@ -61,7 +62,9 @@ public class AdminNoticeController {
             @Valid @RequestBody AdminNoticeRequest request,
             HttpServletRequest httpRequest
     ) {
+        log.info("공지사항 수정 요청: noticeId={}", noticeId);
         AdminNoticeResponse response = adminNoticeService.updateNotice(noticeId, request, httpRequest);
+        log.info("공지사항 수정 완료: noticeId={}", noticeId);
         return ResponseEntity.ok(response);
     }
 
@@ -71,7 +74,9 @@ public class AdminNoticeController {
             @PathVariable Long noticeId,
             HttpServletRequest request
     ) {
+        log.info("공지사항 삭제 요청: noticeId={}", noticeId);
         adminNoticeService.deleteNotice(noticeId, request);
+        log.info("공지사항 삭제 완료: noticeId={}", noticeId);
         return ResponseEntity.noContent().build();
     }
 }

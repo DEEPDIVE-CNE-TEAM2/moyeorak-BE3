@@ -6,11 +6,13 @@ import com.example.moyeorak.service.admin.AdminProgramService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/programs")
@@ -27,9 +29,12 @@ public class AdminProgramController {
             @RequestParam(required = false) Long regionId,
             @RequestParam(required = false) String title
     ) {
+        log.info("프로그램 리스트 조회: regionId={}, title={}", regionId, title);
         List<AdminProgramListResponse> programs = adminProgramService.getProgramsByRegionAndTitle(request, regionId, title);
+        log.info("프로그램 리스트 조회 완료: 조회된 개수={}", programs.size());
         return ResponseEntity.ok(programs);
     }
+
 
 
     @PostMapping
@@ -38,9 +43,12 @@ public class AdminProgramController {
             @RequestBody AdminProgramCreateRequest request,
             HttpServletRequest httpRequest
     ) {
+        log.info("프로그램 등록 요청: title={}, regionId={}", request.getTitle(), request.getRegionId());
         Long programId = adminProgramService.createProgram(request, httpRequest);
+        log.info("프로그램 등록 완료: programId={}", programId);
         return ResponseEntity.status(201).body(programId);
     }
+
 
     @GetMapping("/{programId}")
     @Operation(summary = "관리자 프로그램 상세 조회")
@@ -48,7 +56,9 @@ public class AdminProgramController {
             @PathVariable Long programId,
             HttpServletRequest request
     ) {
+        log.info("프로그램 상세 조회: programId={}", programId);
         AdminProgramDetailResponse programDetail = adminProgramService.getProgramDetail(programId);
+        log.info("프로그램 상세 조회 완료: title={}", programDetail.getTitle());
         return ResponseEntity.ok(programDetail);
     }
 
@@ -59,7 +69,9 @@ public class AdminProgramController {
             @RequestBody AdminProgramUpdateRequest request,
             HttpServletRequest httpRequest
     ) {
+        log.info("프로그램 수정 요청: programId={}", programId);
         Long updatedId = adminProgramService.patchProgram(programId, request, httpRequest);
+        log.info("프로그램 수정 완료: programId={}", updatedId);
         return ResponseEntity.ok(updatedId);
     }
 
@@ -69,7 +81,9 @@ public class AdminProgramController {
             @PathVariable Long programId,
             HttpServletRequest request
     ) {
+        log.info("프로그램 삭제 요청: programId={}", programId);
         MessageResponse response = adminProgramService.deleteProgram(programId, request);
+        log.info("프로그램 삭제 완료: programId={}", programId);
         return ResponseEntity.ok(response);
     }
 }

@@ -33,9 +33,9 @@ public class AdminUserController {
             @RequestParam(required = false) String keyword,
             HttpServletRequest request
     ) {
-        log.info("[회원 조회] regionId={}, keyword={}", regionId, keyword);
+        log.info("회원 조회: regionId={}, keyword={}", regionId, keyword);
         List<AdminUserListResponseDto> result = adminUserService.getUsersByRegionAndKeyword(request, regionId, keyword);
-        log.info("[회원 조회] 결과 {}건", result.size());
+        log.info("회원 조회: 결과 {}건", result.size());
         return result;
     }
 
@@ -45,9 +45,9 @@ public class AdminUserController {
             @RequestBody AdminUserCreateRequestDto dto,
             HttpServletRequest request
     ) {
-        log.info("[유저 생성] 요청 이름={}", dto.getName());
+        log.info("유저 생성: 요청 이름={}", dto.getName());
         adminUserService.createUser(dto, request);
-        log.info("[유저 생성] 완료");
+        log.info("유저 생성: 완료");
         return ResponseEntity.ok().build();
     }
 
@@ -57,7 +57,7 @@ public class AdminUserController {
             @PathVariable Long userId,
             HttpServletRequest request
     ) {
-        log.info("[회원 상세 조회] userId={}", userId);
+        log.info("회원 상세 조회: userId={}", userId);
         AdminUserDetailResponseDto userDetail = adminUserService.getUserDetail(userId, request);
         return ResponseEntity.ok(userDetail);
     }
@@ -70,9 +70,9 @@ public class AdminUserController {
             HttpServletRequest request
 
     ) {
-        log.info("[회원정보 수정] userId={}", userId);
+        log.info("회원정보 수정: userId={}", userId);
         adminUserService.updateUserInfo(userId, dto, request);
-        log.info("[회원정보 수정] 완료 userId={}", userId);
+        log.info("회원정보 수정: 완료 userId={}", userId);
         return ResponseEntity.ok().build();
     }
 
@@ -85,9 +85,9 @@ public class AdminUserController {
             @RequestBody AdminPasswordUpdateRequestDto dto,
             HttpServletRequest request
     ) {
-        log.info("[회원 비밀번호 수정] userId={}", userId);
+        log.info("회원 비밀번호 수정: userId={}", userId);
         adminUserService.updateUserPassword(userId, dto, request);
-        log.info("[회원 비밀번호 수정] 완료 userId={}", userId);
+        log.info("회원 비밀번호 수정: 완료 userId={}", userId);
         return ResponseEntity.ok().build();
     }
 
@@ -97,9 +97,9 @@ public class AdminUserController {
             @PathVariable Long userId,
             HttpServletRequest request
     ) {
-        log.info("[수강 이력 조회] userId={}", userId);
+        log.info("수강 이력 조회: userId={}", userId);
         List<AdminUserEnrollmentDto> enrollments = adminUserService.getUserEnrollments(userId, request);
-        log.info("[수강 이력 조회] 결과 {}건", enrollments.size());
+        log.info("수강 이력 조회: 결과 {}건", enrollments.size());
         return ResponseEntity.ok(enrollments);
     }
 
@@ -109,9 +109,9 @@ public class AdminUserController {
             @PathVariable Long enrollmentId,
             HttpServletRequest request
     ) {
-        log.info("[수강 삭제] enrollmentId={}", enrollmentId);
+        log.info("수강 삭제: enrollmentId={}", enrollmentId);
         adminUserService.cancelEnrollment(enrollmentId, request);
-        log.info("[수강 삭제] 완료 enrollmentId={}", enrollmentId);
+        log.info("수강 삭제: 완료 enrollmentId={}", enrollmentId);
         return ResponseEntity.ok("수강 신청이 성공적으로 취소되었습니다.");
     }
 }
