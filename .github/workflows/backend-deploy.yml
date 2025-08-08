@@ -3,7 +3,7 @@ name: Deploy to Amazon ECS (Blue/Green)
 on:
   push:
     branches:
-      - dev
+      - dev  # 배포 브랜치 ..
 
 env:
   AWS_REGION: ap-northeast-2
@@ -42,8 +42,18 @@ jobs:
         with:
           images: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
 
-      # 기존 JDK/Gradle 빌드 단계 제거
-      # Dockerfile에서 빌드까지 포함되므로 아래 단계로 바로 빌드
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Build with Gradle (test skip)
+        run: ./gradlew build -x test
+
       - name: Build and push Docker image to ECR
         uses: docker/build-push-action@v5
         with:
@@ -58,6 +68,7 @@ jobs:
             --query "taskDefinition" \
             --output json > task-def.json
 
+          # Remove read-only / non-reusable fields
           jq 'del(
             .taskDefinitionArn,
             .revision,
@@ -69,6 +80,7 @@ jobs:
           )' task-def.json > cleaned-task-def.json
 
       - name: Update ECS task definition with new image
+        id: update-task-def
         run: |
           IMAGE="${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest"
           jq --arg IMAGE "$IMAGE" --arg NAME "$CONTAINER_NAME" \
@@ -76,6 +88,7 @@ jobs:
             cleaned-task-def.json > new-task-def.json
 
       - name: Register new ECS task definition
+        id: register-task-def
         run: |
           TASK_DEF_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://new-task-def.json \
@@ -95,3 +108,5 @@ jobs:
             --deployment-group-name moyeorak-backend-dg \
             --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
             --revision "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":$CONTENT}}"
+
+
