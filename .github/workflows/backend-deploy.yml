@@ -3,7 +3,7 @@ name: Deploy to Amazon ECS (Blue/Green)
 on:
   push:
     branches:
-      - dev  # 배포 브랜치 .
+      - dev  # 배포 브랜치 ..
 
 env:
   AWS_REGION: ap-northeast-2
