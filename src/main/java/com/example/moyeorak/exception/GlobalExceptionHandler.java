@@ -22,13 +22,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ErrorResponse.of(400, "잘못된 요청입니다.", ex.getMessage()));
     }
 
-    // 401: JWT 만료
-    @ExceptionHandler(ExpiredJwtException.class)
-    public ResponseEntity<ErrorResponse> handleJwtExpired(HttpServletRequest req, ExpiredJwtException ex) {
-        log.warn("401 Unauthorized - 만료된 JWT: {} {}", req.getMethod(), req.getRequestURI());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse.of(401, "토큰이 만료되었습니다.", null));
-    }
 
     // 404: 잘못된 URI
     @ExceptionHandler(NoResourceFoundException.class)
