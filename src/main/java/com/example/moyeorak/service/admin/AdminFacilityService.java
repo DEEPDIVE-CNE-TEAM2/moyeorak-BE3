@@ -4,12 +4,11 @@ import com.example.moyeorak.dto.admin.*;
 import com.example.moyeorak.entity.*;
 import com.example.moyeorak.repository.FacilityRepository;
 import com.example.moyeorak.repository.RegionRepository;
-import com.example.moyeorak.repository.UserRepository;
+import com.example.moyeorak.security.AdminAuthHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import com.example.moyeorak.jwt.JwtProvider;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -20,12 +19,12 @@ public class AdminFacilityService {
 
     private final FacilityRepository facilityRepository;
     private final RegionRepository regionRepository;
-    private final UserRepository userRepository;
-    private final JwtProvider jwtProvider;
+    private final AdminAuthHelper adminAuthHelper;
+
 
     @Transactional
     public AdminFacilityCreateResponse createFacility(AdminFacilityCreateRequest request, HttpServletRequest httpRequest) {
-        User admin = getAuthenticatedAdmin(httpRequest);
+        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
         Region region = admin.getRegion();
 
         Facility facility = Facility.builder()
@@ -49,7 +48,7 @@ public class AdminFacilityService {
     // 시설 리스트 조회
     @Transactional(readOnly = true)
     public List<AdminFacilityListResponse> getFacilityList(HttpServletRequest httpRequest) {
-        User admin = getAuthenticatedAdmin(httpRequest);
+        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
         Region region = admin.getRegion();
 
         List<Facility> facilities = facilityRepository.findByRegion(region);
@@ -67,7 +66,7 @@ public class AdminFacilityService {
 
     @Transactional(readOnly = true)
     public AdminFacilityDetailResponse getFacilityDetail(Long facilityId, HttpServletRequest httpRequest) {
-        User admin = getAuthenticatedAdmin(httpRequest);
+        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
         Facility facility = facilityRepository.findById(facilityId)
                 .orElseThrow(() -> new IllegalArgumentException("시설이 존재하지 않습니다."));
 
@@ -91,12 +90,8 @@ public class AdminFacilityService {
 
     // 수정
     @Transactional
-    public AdminFacilityDetailResponse updateFacility(
-            Long facilityId,
-            AdminFacilityUpdateRequest request,
-            HttpServletRequest httpRequest
-    ) {
-        User admin = getAuthenticatedAdmin(httpRequest);
+    public AdminFacilityDetailResponse updateFacility(Long facilityId, AdminFacilityUpdateRequest request, HttpServletRequest httpRequest) {
+        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
         Facility facility = facilityRepository.findById(facilityId)
                 .orElseThrow(() -> new IllegalArgumentException("시설이 존재하지 않습니다."));
 
@@ -128,7 +123,7 @@ public class AdminFacilityService {
 
     @Transactional
     public void deleteFacility(Long facilityId, HttpServletRequest httpRequest) {
-        User admin = getAuthenticatedAdmin(httpRequest);
+        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
         Facility facility = facilityRepository.findById(facilityId)
                 .orElseThrow(() -> new IllegalArgumentException("시설이 존재하지 않습니다."));
 
@@ -139,14 +134,4 @@ public class AdminFacilityService {
         facilityRepository.delete(facility);
     }
 
-    private User getAuthenticatedAdmin(HttpServletRequest request) {
-        String token = jwtProvider.resolveToken(request);
-        String email = jwtProvider.getEmail(token);
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
-        if (user.getRole() != User.Role.ADMIN) {
-            throw new IllegalArgumentException("관리자 권한이 없습니다.");
-        }
-        return user;
-    }
 }

@@ -11,6 +11,7 @@ import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
 import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.repository.*;
+import com.example.moyeorak.security.AdminAuthHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,17 +29,17 @@ public class AdminProgramService {
 
     private final ProgramRepository programRepository;         // 프로그램 전체 목록
     private final EnrollmentRepository enrollmentRepository;   // 신청 인원 카운트
-    private final JwtProvider jwtProvider;
-    private final UserRepository userRepository;
     private final RegionRepository regionRepository;
     private final FacilityRepository facilityRepository;
+    private final AdminAuthHelper adminAuthHelper;
+
 
 
 
     // 프로그램 리스트 조회
     public List<AdminProgramListResponse> getProgramsByRegionAndTitle(HttpServletRequest request, Long regionId, String title) {
         // 1. 관리자 검증
-        User admin = getAdminFromRequest(request);
+        User admin = adminAuthHelper.getAdminFromRequest(request);
 
         // 2. 조회할 지역 결정
         Region targetRegion;
@@ -86,7 +87,7 @@ public class AdminProgramService {
     @Transactional
     public Long createProgram(AdminProgramCreateRequest request, HttpServletRequest httpRequest) {
         // 1. 관리자 인증
-        User admin = getAdminFromRequest(httpRequest);
+        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
 
         // 2. 지역과 시설 조회 + 일치 여부 검증
         Region region = regionRepository.findById(request.getRegionId())
@@ -177,7 +178,7 @@ public class AdminProgramService {
     // 프로그램 수정
     @Transactional
     public Long patchProgram(Long programId, AdminProgramUpdateRequest request, HttpServletRequest httpRequest) {
-        User admin = getAdminFromRequest(httpRequest);
+        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
 
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 프로그램이 존재하지 않습니다."));
@@ -221,7 +222,7 @@ public class AdminProgramService {
     // 프로그램 삭제
     @Transactional
     public MessageResponse deleteProgram(Long programId, HttpServletRequest request) {
-        User admin = getAdminFromRequest(request);
+        User admin = adminAuthHelper.getAdminFromRequest(request);
 
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 프로그램이 존재하지 않습니다."));
@@ -234,18 +235,6 @@ public class AdminProgramService {
     // 시간 포매팅
     private String formatTimeRange(LocalTime start, LocalTime end) {
         return start + " ~ " + end;
-    }
-
-    // 유저 관리자 검증
-    private User getAdminFromRequest(HttpServletRequest request) {
-        String token = jwtProvider.resolveToken(request);
-        String email = jwtProvider.getEmail(token);
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("관리자 정보가 없습니다."));
-        if (user.getRole() != User.Role.ADMIN) {
-            throw new IllegalArgumentException("관리자 권한이 없습니다.");
-        }
-        return user;
     }
 
     // 날짜 "YYYY-MM-DD ~ YYYY-MM-DD" 포맷팅
