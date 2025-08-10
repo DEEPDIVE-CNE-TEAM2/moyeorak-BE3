@@ -38,8 +38,17 @@ public class RequestMdcFilter extends OncePerRequestFilter {
         MDC.put("traceId", traceId);
 
         try {
-            // 2. 토큰에서 이메일/권한 뽑기
             String token = jwtProvider.resolveToken(req);
+            // 2. 토큰에서 이메일/권한 뽑기
+
+            // 토큰 유효하지 않으면 요청 차단
+            if (token != null && !jwtProvider.validateToken(token)) {
+                log.warn("만료되었거나 유효하지 않은 토큰입니다. 요청 URI: {}", req.getRequestURI());
+                res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                res.setContentType("application/json");
+                res.getWriter().write("{\"status\":401,\"message\":\"토큰이 만료되었거나 유효하지 않습니다.\"}");
+                return;
+            }
             if (token != null && jwtProvider.validateToken(token)) {
                 String email = jwtProvider.getEmail(token);      // subject = email
                 String roleClaim = jwtProvider.getRole(token);

@@ -75,8 +75,16 @@ public class JwtProvider {
 
     // ✅ 토큰 유효성 검증 (예외는 상위로 throw하여 JwtAuthFilter에서 처리)
     public boolean validateToken(String token) {
-        parseClaims(token); // 여기서 예외 발생 시 그대로 위로 던짐
-        return true;
+        try {
+            parseClaims(token);
+            return true;
+        } catch (ExpiredJwtException e) {
+            log.warn("만료된 JWT: {}", e.getMessage());
+            return false;
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("JWT 유효성 검증 실패: {}", e.getMessage());
+            return false;
+        }
     }
 
     // ✅ 토큰에서 Claims 파싱
