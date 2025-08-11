@@ -27,43 +27,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Pull latest dev
         run: |
           git fetch origin dev
           git checkout dev
           git pull origin dev
-
-
-      - name: Run Snyk test
-        uses: snyk/actions@master
-        with:
-          command: test
-          args: --severity-threshold=medium
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        continue-on-error: true
-
-      - name: Run Snyk monitor
-        uses: snyk/actions@master
-        with:
-          command: monitor
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        continue-on-error: true
-
-      - name: Run OWASP ZAP Baseline Scan
-        run: |
-          mkdir -p zap-reports
-          docker run --rm \
-            --user root \
-            -v ${{ github.workspace }}/zap-reports:/zap/wrk:rw \
-            -t ghcr.io/zaproxy/zaproxy \
-            zap-baseline.py \
-              -t https://api.moyeorak.cloud \
-              -r zap_report.html \
-              -w zap_report.md \
-              || true
-
 
       - name: Configure AWS credentials (using Access Key)
         uses: aws-actions/configure-aws-credentials@v4
@@ -148,3 +117,43 @@ jobs:
             --deployment-group-name moyeorak-backend-dg \
             --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
             --revision "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":$CONTENT}}"
+
+      # ------------------------
+      # 배포 완료 후 보안 검사 시작
+      # ------------------------
+
+      - name: Run Snyk test
+        uses: snyk/actions@master
+        with:
+          command: test
+          args: --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+
+      - name: Run Snyk monitor
+        uses: snyk/actions@master
+        with:
+          command: monitor
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+
+      - name: Run OWASP ZAP Baseline Scan
+        run: |
+          mkdir -p zap-reports
+          docker run --rm \
+            --user root \
+            -v ${{ github.workspace }}/zap-reports:/zap/wrk:rw \
+            -t ghcr.io/zaproxy/zaproxy \
+            zap-baseline.py \
+              -t https://api.moyeorak.cloud \
+              -r zap_report.html \
+              -w zap_report.md \
+              || true
+
+      - name: Upload ZAP HTML Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report-html
+          path: zap-reports/zap_report.html
