@@ -233,9 +233,46 @@ jobs:
       # ------------------------
       # 14. 실패 시 Discord 알림
       # ------------------------
-      - name: Send Discord failure notification
+      - name: 실패 시 Discord 알림
         if: failure()
         run: |
-          STEP_NAME=$(cat fail.log 2>/dev/null || echo "Unknown step failed")
-          PAYLOAD=$(jq -n --arg content "🚨 CI/CD 실패:\n$STEP_NAME\nRepo: $GITHUB_REPOSITORY\nBranch: $GITHUB_REF\nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{content: $content}')
-          curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "${{ secrets.DISCORD_WEBHOOK }}"
+          STEP_NAME=$(cat fail.log 2>/dev/null || echo "알 수 없는 실패 단계")
+          ACTOR="${{ github.actor }}"
+          AUTHOR="${{ github.event.head_commit.author.name }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          REPO="${GITHUB_REPOSITORY}"
+          BRANCH="${GITHUB_REF_NAME}"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          # 심각도 판별 (배포 관련은 Critical, 나머지 Medium)
+          if echo "$STEP_NAME" | grep -qiE "deploy|ecs|codedeploy"; then
+            SEVERITY="심각(Critical) 🔥"
+            COLOR=16711680 # 빨강
+          else
+            SEVERITY="중간(Medium) ⚠"
+            COLOR=15844367 # 노랑
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "🚨 CI/CD 배포 실패 알림" \
+            --arg desc "**실패 단계:** $STEP_NAME\n**심각도:** $SEVERITY" \
+            --arg actor "$ACTOR" \
+            --arg author "$AUTHOR" \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH" \
+            --arg commit "$COMMIT_MSG" \
+            --arg url "$RUN_URL" \
+            --argjson color $COLOR \
+            '{embeds: [{title: $title, description: $desc, color: $color,
+              fields: [
+                {name: "푸시한 사람", value: $actor, inline: true},
+                {name: "커밋 작성자", value: $author, inline: true},
+                {name: "레포지토리", value: $repo, inline: true},
+                {name: "브랜치", value: $branch, inline: true},
+                {name: "커밋 메시지", value: $commit, inline: false},
+                {name: "실행 결과 보기", value: $url, inline: false}
+              ]}]}')
+
+          curl -X POST -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "${{ secrets.DISCORD_WEBHOOK }}"
