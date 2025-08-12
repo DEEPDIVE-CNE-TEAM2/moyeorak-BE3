@@ -23,6 +23,9 @@ jobs:
       contents: read
 
     steps:
+      # ------------------------
+      # 1. 소스 코드 체크아웃
+      # ------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -34,22 +37,44 @@ jobs:
           git checkout dev
           git pull origin dev
 
-      - name: Configure AWS credentials (using Access Key)
+      # ------------------------
+      # 2. AWS 인증 설정
+      # ------------------------
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Log in to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
+      # ------------------------
+      # 3. Amazon ECR 로그인
+      # ------------------------
+      - name: Log in to Amazon ECR (with retry)
+        run: |
+          for i in 1 2 3; do
+            if aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}; then
+              echo "ECR login succeeded"
+              exit 0
+            fi
+            echo "ECR login failed (attempt $i), retrying..."
+            sleep 10
+          done
+          echo "ECR login failed after 3 attempts" >> fail.log
+          exit 1
 
+      # ------------------------
+      # 4. Docker 메타데이터 추출
+      # ------------------------
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
 
+      # ------------------------
+      # 5. JDK & Gradle 빌드
+      # ------------------------
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
@@ -62,32 +87,54 @@ jobs:
       - name: Build with Gradle (test skip)
         run: ./gradlew build -x test
 
-      - name: Build and push Docker image to ECR
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
-            ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-
-      - name: Download ECS task definition
+      # ------------------------
+      # 6. Docker 이미지 빌드 & 푸시
+      # ------------------------
+      - name: Build and push Docker image to ECR (with retry)
         run: |
-          aws ecs describe-task-definition \
-            --task-definition $ECS_TASK_DEF \
-            --query "taskDefinition" \
-            --output json > task-def.json
+          for i in 1 2 3; do
+            if docker buildx build --push \
+              -t ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest \
+              -t ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }} .; then
+              echo "Docker push succeeded"
+              exit 0
+            fi
+            echo "Docker push failed (attempt $i), retrying..."
+            sleep 15
+          done
+          echo "Docker push failed after 3 attempts" >> fail.log
+          exit 1
 
-          jq 'del(
-            .taskDefinitionArn,
-            .revision,
-            .status,
-            .requiresAttributes,
-            .compatibilities,
-            .registeredAt,
-            .registeredBy
-          )' task-def.json > cleaned-task-def.json
+      # ------------------------
+      # 7. ECS Task Definition 다운로드
+      # ------------------------
+      - name: Download ECS task definition (with retry)
+        run: |
+          for i in 1 2 3; do
+            if aws ecs describe-task-definition \
+              --task-definition $ECS_TASK_DEF \
+              --query "taskDefinition" \
+              --output json > task-def.json; then
+              jq 'del(
+                .taskDefinitionArn,
+                .revision,
+                .status,
+                .requiresAttributes,
+                .compatibilities,
+                .registeredAt,
+                .registeredBy
+              )' task-def.json > cleaned-task-def.json
+              exit 0
+            fi
+            echo "Download ECS task definition failed (attempt $i), retrying..."
+            sleep 10
+          done
+          echo "ECS task definition download failed after 3 attempts" >> fail.log
+          exit 1
 
+      # ------------------------
+      # 8. Task Definition 이미지 업데이트
+      # ------------------------
       - name: Update ECS task definition with new image
         id: update-task-def
         run: |
@@ -96,49 +143,72 @@ jobs:
             '.containerDefinitions[] |= if .name == $NAME then .image = $IMAGE else . end' \
             cleaned-task-def.json > new-task-def.json
 
-      - name: Register new ECS task definition
-        id: register-task-def
+      # ------------------------
+      # 9. Task Definition 등록
+      # ------------------------
+      - name: Register new ECS task definition (with retry)
         run: |
-          TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://new-task-def.json \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+          for i in 1 2 3; do
+            if TASK_DEF_ARN=$(aws ecs register-task-definition \
+              --cli-input-json file://new-task-def.json \
+              --query 'taskDefinition.taskDefinitionArn' \
+              --output text); then
+              echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+              exit 0
+            fi
+            echo "Register ECS task definition failed (attempt $i), retrying..."
+            sleep 10
+          done
+          echo "ECS task definition registration failed after 3 attempts" >> fail.log
+          exit 1
 
+      # ------------------------
+      # 10. CodeDeploy AppSpec 준비
+      # ------------------------
       - name: Prepare AppSpec with new task ARN
         run: |
           sed "s|REPLACE_ME_TASK_DEF|$TASK_DEF_ARN|" appspec.yml > rendered-appspec.yml
 
-      - name: Create deployment
+      # ------------------------
+      # 11. CodeDeploy 배포 생성
+      # ------------------------
+      - name: Create deployment (with retry)
         run: |
           CONTENT=$(jq -Rs . < rendered-appspec.yml)
-          aws deploy create-deployment \
-            --application-name moyeorak-backend \
-            --deployment-group-name moyeorak-backend-dg \
-            --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
-            --revision "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":$CONTENT}}"
+          for i in 1 2 3; do
+            if aws deploy create-deployment \
+              --application-name moyeorak-backend \
+              --deployment-group-name moyeorak-backend-dg \
+              --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+              --revision "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":$CONTENT}}"; then
+              exit 0
+            fi
+            echo "Create deployment failed (attempt $i), retrying..."
+            sleep 15
+          done
+          echo "Deployment creation failed after 3 attempts" >> fail.log
+          exit 1
 
       # ------------------------
-      # 배포 완료 후 보안 검사 시작
+      # 12. 보안 검사 - Snyk
       # ------------------------
-
       - name: Run Snyk test
-        uses: snyk/actions@master
-        with:
-          command: test
-          args: --severity-threshold=medium
+        run: |
+          snyk test --severity-threshold=medium || {
+            echo "Snyk test failed - vulnerabilities found" >> fail.log
+            exit 1
+          }
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        continue-on-error: true
 
       - name: Run Snyk monitor
-        uses: snyk/actions@master
-        with:
-          command: monitor
+        run: snyk monitor
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        continue-on-error: true
 
+      # ------------------------
+      # 13. 보안 검사 - OWASP ZAP
+      # ------------------------
       - name: Run OWASP ZAP Baseline Scan
         run: |
           mkdir -p zap-reports
@@ -149,11 +219,23 @@ jobs:
             zap-baseline.py \
               -t https://api.moyeorak.cloud \
               -r zap_report.html \
-              -w zap_report.md \
-              || true
+              -w zap_report.md || {
+                echo "OWASP ZAP scan detected issues" >> fail.log
+                exit 1
+              }
 
       - name: Upload ZAP HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: zap-report-html
           path: zap-reports/zap_report.html
+
+      # ------------------------
+      # 14. 실패 시 Discord 알림
+      # ------------------------
+      - name: Send Discord failure notification
+        if: failure()
+        run: |
+          STEP_NAME=$(cat fail.log 2>/dev/null || echo "Unknown step failed")
+          PAYLOAD=$(jq -n --arg content "🚨 CI/CD 실패:\n$STEP_NAME\nRepo: $GITHUB_REPOSITORY\nBranch: $GITHUB_REF\nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{content: $content}')
+          curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "${{ secrets.DISCORD_WEBHOOK }}"
