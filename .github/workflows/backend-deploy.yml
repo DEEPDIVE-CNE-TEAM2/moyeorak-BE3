@@ -217,7 +217,6 @@ jobs:
           BACKEND_BEARER_TOKEN: ${{ secrets.BACKEND_BEARER_TOKEN }}
         run: |
           echo "Testing API with Authorization header..."
-          # 상세 응답/상태코드 저장 (실패해도 파이프라인 중단시키지 않음)
           curl -v -o /tmp/curl_out.txt -s -w "\nHTTP_STATUS:%{http_code}\n" \
             -H "Authorization: Bearer $BACKEND_BEARER_TOKEN" \
             -H "Accept: application/json" \
@@ -226,20 +225,25 @@ jobs:
           tail -n 200 /tmp/curl_out.txt || true
 
       # ------------------------
-      # 14. 보안 검사 - OWASP ZAP (개선된 실행: 토큰을 컨테이너 env로 전달, 로그 캡처)
+      # 14. 보안 검사 - OWASP ZAP (zap 경로 이슈 해결)
       # ------------------------
-      - name: 보안 검사 - OWASP ZAP
+      - name: Inspect ZAP image (/zap contents) - debug
+        run: |
+          echo "Listing /zap in ZAP image to confirm scripts exist..."
+          docker run --rm ghcr.io/zaproxy/zaproxy:latest ls -la /zap || true
+
+      - name: 보안 검사 - OWASP ZAP 
         env:
           BACKEND_BEARER_TOKEN: ${{ secrets.BACKEND_BEARER_TOKEN }}
         run: |
           mkdir -p zap-reports
-          echo "Starting ZAP baseline scan..."
-          # 컨테이너 내부에서 환경변수로 토큰을 확장하도록 실행 (호스트 프로세스에 토큰 노출 최소화)
+          echo "Starting ZAP baseline scan (using /zap/zap-baseline.py)..."
+          # 컨테이너 내부에서 환경변수로 토큰을 확장하도록 실행 (호스트에 토큰 노출 최소화)
           docker run --rm \
             -v "${{ github.workspace }}/zap-reports":/zap/wrk:rw \
             -e BACKEND_BEARER_TOKEN="$BACKEND_BEARER_TOKEN" \
-            -t ghcr.io/zaproxy/zaproxy \
-            bash -lc 'zap-baseline.py -t https://api.moyeorak.cloud \
+            -t ghcr.io/zaproxy/zaproxy:latest \
+            sh -c '/zap/zap-baseline.py -t https://api.moyeorak.cloud \
               -r /zap/wrk/zap_report.html \
               -w /zap/wrk/zap_report.md \
               -J /zap/wrk/zap_out.json \
@@ -247,7 +251,7 @@ jobs:
               -z "-config connection.ignore401=true"' \
             2>&1 | tee /tmp/zap_cli.log || true
 
-          echo "=== zap-reports 디렉토리 ==="
+          echo "=== zap-reports 디렉토리 (컨텐츠 확인) ==="
           ls -la zap-reports || true
 
           echo "=== ZAP stdout 마지막 200줄 ==="
@@ -258,6 +262,7 @@ jobs:
         with:
           name: zap-reports
           path: zap-reports/**
+
 
       # ------------------------
       # 15. 실패 시 Discord 알림
