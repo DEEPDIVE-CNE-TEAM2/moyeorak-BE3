@@ -209,35 +209,58 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
 
+      # ------------------------
+      # 13. 토큰으로 API 접근 확인 (curl)
+      # ------------------------
+      - name: Check API with token (curl)
+        env:
+          BACKEND_BEARER_TOKEN: ${{ secrets.BACKEND_BEARER_TOKEN }}
+        run: |
+          echo "Testing API with Authorization header..."
+          # 상세 응답/상태코드 저장 (실패해도 파이프라인 중단시키지 않음)
+          curl -v -o /tmp/curl_out.txt -s -w "\nHTTP_STATUS:%{http_code}\n" \
+            -H "Authorization: Bearer $BACKEND_BEARER_TOKEN" \
+            -H "Accept: application/json" \
+            "https://api.moyeorak.cloud/" || true
+          echo "=== curl 결과 (마지막 200줄) ==="
+          tail -n 200 /tmp/curl_out.txt || true
 
       # ------------------------
-      # 13. 보안 검사 - OWASP ZAP
+      # 14. 보안 검사 - OWASP ZAP (개선된 실행: 토큰을 컨테이너 env로 전달, 로그 캡처)
       # ------------------------
       - name: 보안 검사 - OWASP ZAP
+        env:
+          BACKEND_BEARER_TOKEN: ${{ secrets.BACKEND_BEARER_TOKEN }}
         run: |
           mkdir -p zap-reports
+          echo "Starting ZAP baseline scan..."
+          # 컨테이너 내부에서 환경변수로 토큰을 확장하도록 실행 (호스트 프로세스에 토큰 노출 최소화)
           docker run --rm \
-            --user root \
-            -v ${{ github.workspace }}/zap-reports:/zap/wrk:rw \
+            -v "${{ github.workspace }}/zap-reports":/zap/wrk:rw \
+            -e BACKEND_BEARER_TOKEN="$BACKEND_BEARER_TOKEN" \
             -t ghcr.io/zaproxy/zaproxy \
-            zap-baseline.py \
-              -t https://api.moyeorak.cloud \
+            bash -lc 'zap-baseline.py -t https://api.moyeorak.cloud \
               -r /zap/wrk/zap_report.html \
               -w /zap/wrk/zap_report.md \
               -J /zap/wrk/zap_out.json \
-              -H "Authorization: Bearer ${{ secrets.BACKEND_BEARER_TOKEN }}" \
-              -z "-config connection.ignore401=true" || true
+              -H "Authorization: Bearer $BACKEND_BEARER_TOKEN" \
+              -z "-config connection.ignore401=true"' \
+            2>&1 | tee /tmp/zap_cli.log || true
 
-      - name: OWASP ZAP HTML 리포트
+          echo "=== zap-reports 디렉토리 ==="
+          ls -la zap-reports || true
+
+          echo "=== ZAP stdout 마지막 200줄 ==="
+          tail -n 200 /tmp/zap_cli.log || true
+
+      - name: OWASP ZAP 아티팩트 업로드 (모든 생성 파일 업로드)
         uses: actions/upload-artifact@v4
         with:
-          name: zap-report-html
-          path: zap-reports/zap_report.html
-
-
+          name: zap-reports
+          path: zap-reports/**
 
       # ------------------------
-      # 14. 실패 시 Discord 알림
+      # 15. 실패 시 Discord 알림
       # ------------------------
       - name: 실패 시 Discord 알림
         if: failure()
