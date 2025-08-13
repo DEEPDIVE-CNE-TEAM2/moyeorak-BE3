@@ -222,6 +222,7 @@ jobs:
             -t ghcr.io/zaproxy/zaproxy \
             zap-baseline.py \
               -t https://api.moyeorak.cloud \
+              -z "auth_header=Authorization: Bearer ${{ secrets.BACKEND_BEARER_TOKEN }}" \
               -r zap_report.html \
               -w zap_report.md || {
                 echo "OWASP ZAP 보안 검사에서 문제를 발견했습니다. 결과를 확인해 주세요." >> fail.log
@@ -233,6 +234,7 @@ jobs:
         with:
           name: zap-report-html
           path: zap-reports/zap_report.html
+
 
       # ------------------------
       # 14. 실패 시 Discord 알림
