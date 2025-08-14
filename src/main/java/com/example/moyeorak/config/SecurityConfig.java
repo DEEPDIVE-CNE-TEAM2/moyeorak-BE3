@@ -71,13 +71,14 @@ public class SecurityConfig {
                 "http://localhost:3000",
                 "http://localhost:8080",
                 "http://localhost:5173",
+                "http://127.0.0.1:5173",
                 "http://goorm-alb-1610121085.ap-northeast-2.elb.amazonaws.com",
                 "https://www.moyeorak.cloud",
                 "https://moyeorak.cloud",
                 "https://api.moyeorak.cloud"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L); // 1시간 preflight 캐시
 

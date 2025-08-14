@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAll(HttpServletRequest request, Exception ex) {
         String uri = request.getRequestURI();
 
-        log.error("500 Internal Server Error - URI: {}, Message: {}", uri, ex.getMessage(), ex);
+        log.error("500 Internal Server Error - URI: {}, Message: {}", uri, ex.getMessage());
 
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
