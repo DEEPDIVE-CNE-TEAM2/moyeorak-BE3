@@ -141,7 +141,6 @@ jobs:
           IMAGE="${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest"
           jq --arg IMAGE "$IMAGE" --arg NAME "$CONTAINER_NAME" \
             '.containerDefinitions[] |= if .name == $NAME then .image = $IMAGE else . end
-             | .enableExecuteCommand = true' \
             cleaned-task-def.json > new-task-def.json
 
       # ------------------------
