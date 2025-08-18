@@ -132,16 +132,16 @@ jobs:
           echo "ECS Task Definition 정보를 3회 연속 다운로드하지 못했습니다. Task Definition 이름과 권한을 확인해주세요." >> fail.log
           exit 1
 
-# ------------------------
-# 8. Task Definition 이미지 업데이트
-# ------------------------
-- name: Task Definition 이미지 업데이트
-  id: update-task-def
-  run: |
-    IMAGE="${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}@sha256:80c9e7ebab865115f397f1256a5205f3363aeaa0dc546bf8f25b4f348d75b926"
-    jq --arg IMAGE "$IMAGE" --arg NAME "$CONTAINER_NAME" \
-      '.containerDefinitions[] |= if .name == $NAME then .image = $IMAGE else . end' \
-      cleaned-task-def.json > new-task-def.json
+      # ------------------------
+      # 8. Task Definition 이미지 업데이트
+      # ------------------------
+      - name: Task Definition 이미지 업데이트
+        id: update-task-def
+        run: |
+          IMAGE="${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}@sha256:80c9e7ebab865115f397f1256a5205f3363aeaa0dc546bf8f25b4f348d75b926"
+          jq --arg IMAGE "$IMAGE" --arg NAME "$CONTAINER_NAME" \
+            '.containerDefinitions[] |= if .name == $NAME then .image = $IMAGE else . end' \
+            cleaned-task-def.json > new-task-def.json
 
 
       # ------------------------
