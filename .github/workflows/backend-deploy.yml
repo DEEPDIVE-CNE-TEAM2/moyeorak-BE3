@@ -138,10 +138,11 @@ jobs:
       - name: Task Definition 이미지 업데이트
         id: update-task-def
         run: |
-          IMAGE="${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:v52"
+          IMAGE="${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}@sha256:1635e5912dd61daaacd3738d2a9edb56ff51042eadf62b1b39e18330a23e6d09"
           jq --arg IMAGE "$IMAGE" --arg NAME "$CONTAINER_NAME" \
             '.containerDefinitions[] |= if .name == $NAME then .image = $IMAGE else . end' \
             cleaned-task-def.json > new-task-def.json
+
 
       # ------------------------
       # 9. Task Definition 등록
