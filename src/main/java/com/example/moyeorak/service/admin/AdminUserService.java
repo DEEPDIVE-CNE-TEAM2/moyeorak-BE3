@@ -5,6 +5,8 @@ import com.example.moyeorak.entity.Enrollment;
 import com.example.moyeorak.entity.Program;
 import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
+import com.example.moyeorak.exception.BusinessException;
+import com.example.moyeorak.exception.ErrorCode;
 import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.repository.EnrollmentRepository;
 import com.example.moyeorak.repository.UserRepository;
@@ -36,29 +38,15 @@ public class AdminUserService {
 
     // 토큰 기반으로 관리자 식별 + 담당 지역 유저 조회 (키워드 필터링 포함)
     public List<AdminUserListResponseDto> getUsersByRegionAndKeyword(HttpServletRequest request, Long regionId, String keyword) {
-        User admin = adminAuthHelper.getAdminFromRequest(request);
+        Region targetRegion = (regionId == null)
+                ? adminAuthHelper.getAdminRegion(request)
+                : regionRepository.findById(regionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
 
-        // 조회할 지역 결정
-        Region targetRegion;
-        if (regionId == null) {
-            targetRegion = admin.getRegion();
-            if (targetRegion == null) {
-                throw new IllegalStateException("관리자에게 지역 정보가 설정되어 있지 않습니다.");
-            }
-        } else {
-            targetRegion = regionRepository.findById(regionId)
-                    .orElseThrow(() -> new IllegalArgumentException("해당 지역이 존재하지 않습니다."));
-        }
+        List<User> users = (keyword == null || keyword.trim().isEmpty())
+                ? userRepository.findByRegionAndRole(targetRegion, User.Role.USER)
+                : userRepository.findByRegionAndRoleAndNameContainingIgnoreCase(targetRegion, User.Role.USER, keyword.trim());
 
-        // 일반 유저만 조회 (관리자 제외) + 키워드 필터링
-        List<User> users;
-        if (keyword == null || keyword.trim().isEmpty()) {
-            users = userRepository.findByRegionAndRole(targetRegion, User.Role.USER);
-        } else {
-            users = userRepository.findByRegionAndRoleAndNameContainingIgnoreCase(targetRegion, User.Role.USER, keyword.trim());
-        }
-
-        // DTO 변환
         return users.stream()
                 .map(AdminUserListResponseDto::from)
                 .toList();
@@ -68,17 +56,10 @@ public class AdminUserService {
     // 관리자 지역 기반으로 해당 지역 유저 생성
     @Transactional
     public void createUser(AdminUserCreateRequestDto dto, HttpServletRequest request) {
-        User admin = adminAuthHelper.getAdminFromRequest(request);
+        Region region = adminAuthHelper.getAdminRegion(request);
 
-        // 관리자 지역 가져오기
-        Region region = admin.getRegion();
-        if (region == null) {
-            throw new IllegalStateException("관리자 지역 정보가 없습니다.");
-        }
-
-        // 유저 생성 null 체크 먼저
-        if (dto.getEmail() == null) {
-            throw new IllegalArgumentException("이메일은 null일 수 없습니다.");
+        if (dto.getEmail() == null || dto.getEmail().trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.NULL_EMAIL);
         }
 
         User newUser = User.builder()
@@ -97,22 +78,23 @@ public class AdminUserService {
 
     private User.Gender parseGender(String gender) {
         if (gender == null) {
-            throw new IllegalArgumentException("성별 정보가 null입니다.");
+            throw new BusinessException(ErrorCode.NULL_GENDER);
         }
         return switch (gender.trim()) {
             case "남" -> User.Gender.MALE;
             case "여" -> User.Gender.FEMALE;
-            default -> throw new IllegalArgumentException("성별은 '남' 또는 '여'여야 합니다.");
+            default -> throw new BusinessException(ErrorCode.INVALID_GENDER);
         };
     }
 
     private LocalDate parseBirthDate(String birth) {
         try {
-            return LocalDate.parse(birth);  // yyyy-MM-dd 형식 기대
+            return LocalDate.parse(birth);
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("생년월일 형식이 잘못되었습니다: " + birth);
+            throw new BusinessException(ErrorCode.INVALID_BIRTH_FORMAT);
         }
     }
+
 
     // 회원 상세정보 응답
     public AdminUserDetailResponseDto getUserDetail(Long userId, HttpServletRequest request) {
@@ -120,12 +102,7 @@ public class AdminUserService {
 
         // 유저 조회
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
-
-        // 유저가 관리자 담당 지역 유저인지 검증
-        if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
-        }
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
 
         // 응답 DTO 구성
         return AdminUserDetailResponseDto.builder()
@@ -147,12 +124,10 @@ public class AdminUserService {
         User admin = adminAuthHelper.getAdminFromRequest(request);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
 
         // 지역 검증
-        if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
-        }
+        adminAuthHelper.validateAdminRegionAccess(admin, user.getRegion());
 
         if (dto.getEmail() != null) {
             user.setEmail(dto.getEmail());
@@ -162,7 +137,7 @@ public class AdminUserService {
         }
         if (dto.getRegionId() != null) {
             Region region = regionRepository.findById(dto.getRegionId())
-                    .orElseThrow(() -> new IllegalArgumentException("해당 지역이 존재하지 않습니다."));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
             user.setRegion(region);
         }
     }
@@ -173,14 +148,12 @@ public class AdminUserService {
         User admin = adminAuthHelper.getAdminFromRequest(request);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
 
-        if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
-        }
+        adminAuthHelper.validateAdminRegionAccess(admin, user.getRegion());
 
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
-            throw new IllegalArgumentException("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
+            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
@@ -191,11 +164,8 @@ public class AdminUserService {
         User admin = adminAuthHelper.getAdminFromRequest(request);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
 
-        if (!user.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new IllegalArgumentException("관리자 담당 지역 유저가 아닙니다.");
-        }
 
         List<Enrollment> enrollments = enrollmentRepository.findAllWithProgramAndRegionByUserId(userId);
 
@@ -220,18 +190,18 @@ public class AdminUserService {
         User admin = adminAuthHelper.getAdminFromRequest(request);
 
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 수강신청이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ENROLLMENT));
 
         if (!enrollment.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new IllegalArgumentException("관리자 담당 지역의 수강신청이 아닙니다.");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED_REGION_ACCESS);
         }
 
         if (enrollment.getStatus() != Enrollment.Status.ENROLLED) {
-            throw new IllegalStateException("이미 취소되었거나 수강중 상태가 아닙니다.");
+            throw new BusinessException(ErrorCode.INVALID_ENROLLMENT_STATUS);
         }
 
         if (enrollment.getProgram().getStatus() == Program.Status.CLOSED) {
-            throw new IllegalStateException("종료된 프로그램은 취소할 수 없습니다.");
+            throw new BusinessException(ErrorCode.PROGRAM_CLOSED);
         }
 
         enrollment.setStatus(Enrollment.Status.CANCELLED);
