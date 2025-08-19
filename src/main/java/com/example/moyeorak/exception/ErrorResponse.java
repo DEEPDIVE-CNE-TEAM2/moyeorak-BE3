@@ -7,10 +7,14 @@ import lombok.Getter;
 @AllArgsConstructor
 public class ErrorResponse {
     private int status;
+    private String code;
     private String message;
-    private String detail;
 
-    public static ErrorResponse of(int status, String message, String detail) {
-        return new ErrorResponse(status, message, detail);
+    public static ErrorResponse of(ErrorCode errorCode) {
+        return new ErrorResponse(
+                errorCode.getStatus().value(),
+                errorCode.name(),
+                errorCode.getMessage()
+        );
     }
 }
