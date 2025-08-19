@@ -2,6 +2,8 @@ package com.example.moyeorak.service.admin;
 
 import com.example.moyeorak.dto.admin.*;
 import com.example.moyeorak.entity.*;
+import com.example.moyeorak.exception.BusinessException;
+import com.example.moyeorak.exception.ErrorCode;
 import com.example.moyeorak.repository.FacilityRepository;
 import com.example.moyeorak.repository.RegionRepository;
 import com.example.moyeorak.security.AdminAuthHelper;
@@ -68,11 +70,10 @@ public class AdminFacilityService {
     public AdminFacilityDetailResponse getFacilityDetail(Long facilityId, HttpServletRequest httpRequest) {
         User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
         Facility facility = facilityRepository.findById(facilityId)
-                .orElseThrow(() -> new IllegalArgumentException("시설이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
 
-        // 자기 지역 시설인지 체크
         if (!facility.getRegion().equals(admin.getRegion())) {
-            throw new IllegalArgumentException("해당 시설에 접근할 권한이 없습니다.");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
         }
 
         return AdminFacilityDetailResponse.builder()
@@ -93,10 +94,10 @@ public class AdminFacilityService {
     public AdminFacilityDetailResponse updateFacility(Long facilityId, AdminFacilityUpdateRequest request, HttpServletRequest httpRequest) {
         User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
         Facility facility = facilityRepository.findById(facilityId)
-                .orElseThrow(() -> new IllegalArgumentException("시설이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
 
         if (!facility.getRegion().equals(admin.getRegion())) {
-            throw new IllegalArgumentException("해당 시설에 접근할 권한이 없습니다.");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
         }
 
         facility.setName(request.getName());
@@ -125,12 +126,11 @@ public class AdminFacilityService {
     public void deleteFacility(Long facilityId, HttpServletRequest httpRequest) {
         User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
         Facility facility = facilityRepository.findById(facilityId)
-                .orElseThrow(() -> new IllegalArgumentException("시설이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
 
         if (!facility.getRegion().equals(admin.getRegion())) {
-            throw new IllegalArgumentException("해당 시설에 접근할 권한이 없습니다.");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
         }
-
         facilityRepository.delete(facility);
     }
 

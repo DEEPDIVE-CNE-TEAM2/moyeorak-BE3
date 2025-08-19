@@ -7,11 +7,9 @@ import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
 import com.example.moyeorak.exception.BusinessException;
 import com.example.moyeorak.exception.ErrorCode;
-import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.repository.EnrollmentRepository;
 import com.example.moyeorak.repository.UserRepository;
 import com.example.moyeorak.repository.RegionRepository;
-import com.example.moyeorak.repository.ProgramRepository;
 import com.example.moyeorak.security.AdminAuthHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
@@ -29,7 +27,6 @@ import java.util.List;
 public class AdminUserService {
 
     private final UserRepository userRepository;
-    private final JwtProvider jwtProvider;
     private final RegionRepository regionRepository;
     private final PasswordEncoder passwordEncoder;
     private final EnrollmentRepository enrollmentRepository;

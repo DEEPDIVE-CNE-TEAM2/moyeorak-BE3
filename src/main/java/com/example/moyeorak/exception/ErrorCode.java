@@ -21,11 +21,29 @@ public enum ErrorCode {
     // REGION
     NOT_FOUND_REGION(HttpStatus.NOT_FOUND, "해당 지역이 존재하지 않습니다."),
 
+    //FACILITY
+    FACILITY_REGION_MISMATCH(HttpStatus.BAD_REQUEST, "선택한 시설이 해당 지역에 속하지 않습니다."),
+    NOT_FOUND_FACILITY(HttpStatus.NOT_FOUND, "시설 정보가 없습니다."),
+    UNAUTHORIZED_FACILITY_ACCESS(HttpStatus.FORBIDDEN, "해당 시설에 접근할 권한이 없습니다."),
+
+    //PROGRAM
+    NOT_FOUND_PROGRAM(HttpStatus.NOT_FOUND, "해당 프로그램이 존재하지 않습니다."),
+
+    //NOTICE
+    NOT_FOUND_NOTICE(HttpStatus.NOT_FOUND, "공지사항이 존재하지 않습니다."),
+
+    //MAINIMAGE
+    NOT_FOUND_MAIN_IMAGE(HttpStatus.NOT_FOUND, "해당 홍보물이 존재하지 않습니다."),
+    NOT_FOUND_MAIN_IMAGE_ID(HttpStatus.NOT_FOUND, "해당 ID의 홍보물이 존재하지 않습니다."),
+
     // ENROLLMENT
     NOT_FOUND_ENROLLMENT(HttpStatus.NOT_FOUND, "해당 수강신청이 존재하지 않습니다."),
     ENROLLMENT_ALREADY_CANCELLED(HttpStatus.BAD_REQUEST, "이미 취소되었거나 수강중 상태가 아닙니다."),
     PROGRAM_CLOSED(HttpStatus.BAD_REQUEST, "종료된 프로그램은 취소할 수 없습니다."),
     NO_ADMIN_REGION(HttpStatus.INTERNAL_SERVER_ERROR, "관리자에게 지역 정보가 설정되어 있지 않습니다.");
+
+
+
 
     private final HttpStatus status;
     private final String message;

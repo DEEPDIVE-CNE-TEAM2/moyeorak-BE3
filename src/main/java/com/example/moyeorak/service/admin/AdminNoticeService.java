@@ -7,6 +7,8 @@ import com.example.moyeorak.dto.admin.AdminNoticeResponse;
 import com.example.moyeorak.entity.Notice;
 import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
+import com.example.moyeorak.exception.BusinessException;
+import com.example.moyeorak.exception.ErrorCode;
 import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.repository.NoticeRepository;
 import com.example.moyeorak.repository.UserRepository;
@@ -30,13 +32,9 @@ public class AdminNoticeService {
     // 공지사항 생성
     @Transactional
     public AdminNoticeResponse createNotice(AdminNoticeRequest dto, HttpServletRequest request) {
-        // 1. 관리자 인증
         User admin = adminAuthHelper.getAdminFromRequest(request);
-
-        // 2. 지역 조회
         Region region = admin.getRegion();
 
-        // 3. 공지사항 엔티티 생성
         Notice notice = Notice.builder()
                 .title(dto.getTitle())
                 .content(dto.getContent())
@@ -61,20 +59,20 @@ public class AdminNoticeService {
     // 관리자 공지사항 상세보기
     @Transactional(readOnly = true)
     public AdminNoticeResponse getNoticeDetail(Long noticeId, HttpServletRequest request) {
-        User admin = adminAuthHelper.getAdminFromRequest(request);
-        Notice notice = noticeRepository.findById(noticeId)
-                .orElseThrow(() -> new IllegalArgumentException("공지사항이 존재하지 않습니다."));
+        adminAuthHelper.getAdminFromRequest(request);
 
+        Notice notice = noticeRepository.findById(noticeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_NOTICE));
         return AdminNoticeResponse.from(notice);
     }
 
     // 공지사항 수정하기
     @Transactional
     public AdminNoticeResponse updateNotice(Long noticeId, AdminNoticeRequest dto, HttpServletRequest request) {
-        User admin = adminAuthHelper.getAdminFromRequest(request);
-        Notice notice = noticeRepository.findById(noticeId)
-                .orElseThrow(() -> new IllegalArgumentException("공지사항이 존재하지 않습니다."));
+        adminAuthHelper.getAdminFromRequest(request);
 
+        Notice notice = noticeRepository.findById(noticeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_NOTICE));
         notice.setTitle(dto.getTitle());
         notice.setContent(dto.getContent());
 
@@ -83,11 +81,9 @@ public class AdminNoticeService {
 
     @Transactional
     public void deleteNotice(Long noticeId, HttpServletRequest request) {
-        User admin = adminAuthHelper.getAdminFromRequest(request);
-
+        adminAuthHelper.getAdminFromRequest(request);
         Notice notice = noticeRepository.findById(noticeId)
-                .orElseThrow(() -> new IllegalArgumentException("공지사항이 존재하지 않습니다."));
-
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_NOTICE));
         noticeRepository.delete(notice);
     }
 

@@ -9,6 +9,8 @@ import com.example.moyeorak.entity.Facility;
 import com.example.moyeorak.entity.Program;
 import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
+import com.example.moyeorak.exception.BusinessException;
+import com.example.moyeorak.exception.ErrorCode;
 import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.repository.*;
 import com.example.moyeorak.security.AdminAuthHelper;
@@ -38,30 +40,16 @@ public class AdminProgramService {
 
     // 프로그램 리스트 조회
     public List<AdminProgramListResponse> getProgramsByRegionAndTitle(HttpServletRequest request, Long regionId, String title) {
-        // 1. 관리자 검증
-        User admin = adminAuthHelper.getAdminFromRequest(request);
+        // 관리자 검증
+        Region targetRegion = (regionId == null)
+                ? adminAuthHelper.getAdminRegion(request)
+                : regionRepository.findById(regionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+        // 지역 결정
+        List<Program> programs = (title == null || title.trim().isEmpty())
+                ? programRepository.findByRegion(targetRegion)
+                : programRepository.findByRegionAndTitleContainingIgnoreCase(targetRegion, title.trim());
 
-        // 2. 조회할 지역 결정
-        Region targetRegion;
-        if (regionId == null) {
-            targetRegion = admin.getRegion();
-            if (targetRegion == null) {
-                throw new IllegalStateException("관리자에게 지역 정보가 없습니다.");
-            }
-        } else {
-            targetRegion = regionRepository.findById(regionId)
-                    .orElseThrow(() -> new IllegalArgumentException("해당 지역이 존재하지 않습니다."));
-        }
-
-        // 3. 조건에 맞는 프로그램 조회
-        List<Program> programs;
-        if (title == null || title.trim().isEmpty()) {
-            programs = programRepository.findByRegion(targetRegion);
-        } else {
-            programs = programRepository.findByRegionAndTitleContainingIgnoreCase(targetRegion, title.trim());
-        }
-
-        // 4. DTO 변환
         return programs.stream()
                 .map(this::toAdminListDto)
                 .toList();
@@ -86,19 +74,18 @@ public class AdminProgramService {
     // 프로그램 생성
     @Transactional
     public Long createProgram(AdminProgramCreateRequest request, HttpServletRequest httpRequest) {
-        // 1. 관리자 인증
-        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
-
-        // 2. 지역과 시설 조회 + 일치 여부 검증
+        // 지역과 시설 조회 + 일치 여부 검증
         Region region = regionRepository.findById(request.getRegionId())
-                .orElseThrow(() -> new IllegalArgumentException("지역 정보가 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+
         Facility facility = facilityRepository.findById(request.getFacilityId())
-                .orElseThrow(() -> new IllegalArgumentException("시설 정보가 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
+
         if (!facility.getRegion().getId().equals(region.getId())) {
-            throw new IllegalArgumentException("선택한 시설이 해당 지역에 속하지 않습니다.");
+            throw new BusinessException(ErrorCode.FACILITY_REGION_MISMATCH);
         }
 
-        // 3. 프로그램 엔티티 생성
+        // 프로그램 엔티티 생성
         Program program = Program.builder()
                 .title(request.getTitle())
                 .region(region)
@@ -130,7 +117,7 @@ public class AdminProgramService {
     // 프로그램 상세 조회
     public AdminProgramDetailResponse getProgramDetail(Long programId) {
         Program program = programRepository.findById(programId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 프로그램이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PROGRAM));
 
         return AdminProgramDetailResponse.builder()
                 .id(program.getId())
@@ -181,7 +168,7 @@ public class AdminProgramService {
         User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
 
         Program program = programRepository.findById(programId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 프로그램이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PROGRAM));
 
         // 값 있는 것만 덮어쓰기
         if (request.getTitle() != null) program.setTitle(request.getTitle());
@@ -206,11 +193,10 @@ public class AdminProgramService {
 
         if (request.getFacilityId() != null) {
             Facility facility = facilityRepository.findById(request.getFacilityId())
-                    .orElseThrow(() -> new IllegalArgumentException("시설 정보가 없습니다."));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
 
-            // 기존 지역과 시설 지역이 다르면 거부
             if (!facility.getRegion().getId().equals(program.getRegion().getId())) {
-                throw new IllegalArgumentException("선택한 시설(" + facility.getName() + ")은 현재 지역에 속하지 않습니다.");
+                throw new BusinessException(ErrorCode.FACILITY_REGION_MISMATCH);
             }
 
             program.setFacility(facility);
@@ -225,7 +211,7 @@ public class AdminProgramService {
         User admin = adminAuthHelper.getAdminFromRequest(request);
 
         Program program = programRepository.findById(programId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 프로그램이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PROGRAM));
 
         programRepository.delete(program);
 
@@ -249,7 +235,6 @@ public class AdminProgramService {
         else if (!today.isAfter(end)) return "진행중";
         else return "수업 종료";
     }
-
 
 
 }

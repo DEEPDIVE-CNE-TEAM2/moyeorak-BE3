@@ -5,6 +5,8 @@ import com.example.moyeorak.dto.admin.AdminMainImageResponse;
 import com.example.moyeorak.dto.admin.AdminMainImageUpdateRequest;
 import com.example.moyeorak.entity.MainImage;
 import com.example.moyeorak.entity.User;
+import com.example.moyeorak.exception.BusinessException;
+import com.example.moyeorak.exception.ErrorCode;
 import com.example.moyeorak.repository.MainImageRepository;
 import com.example.moyeorak.security.AdminAuthHelper;
 import jakarta.persistence.EntityNotFoundException;
@@ -59,7 +61,7 @@ public class AdminMainImageService {
     public void updateMainImages(List<AdminMainImageUpdateRequest> requestList) {
         for (AdminMainImageUpdateRequest req : requestList) {
             MainImage image = mainImageRepository.findById(req.getId())
-                    .orElseThrow(() -> new EntityNotFoundException("해당 ID 없음: " + req.getId()));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MAIN_IMAGE_ID));
 
             //image.changeDisplayOrder(req.getDisplayOrder()); 다시 처리 할 예정
             image.changeActiveStatus(req.getIsActive());
@@ -69,7 +71,7 @@ public class AdminMainImageService {
     // 홍보물 삭제
     public void deleteById(Long id) {
         if (!mainImageRepository.existsById(id)) {
-            throw new EntityNotFoundException("해당 ID의 홍보물이 존재하지 않음");
+            throw new BusinessException(ErrorCode.NOT_FOUND_MAIN_IMAGE_ID);
         }
         mainImageRepository.deleteById(id);
     }
