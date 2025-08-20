@@ -24,29 +24,55 @@ repositories {
 }
 
 dependencies {
+    // --- Spring Boot ---
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+    // OpenAPI (Swagger UI)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
+
+    // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
-    compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    runtimeOnly 'com.mysql:mysql-connector-j'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    // DevTools
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // DB Driver
+    runtimeOnly 'com.mysql:mysql-connector-j'  // 9.x 사용 중 (OK)
+
+    // --- Test ---
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    implementation 'org.springframework.boot:spring-boot-starter-cache'
-    implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.0.2")
-    implementation 'io.awspring.cloud:spring-cloud-aws-starter-sqs'
-    //implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
-    //implementation 'io.awspring.cloud:spring-cloud-aws-messaging:3.1.0'
 
+    // --- AWS Spring Cloud (SQS) ---
+    // spring-cloud-aws BOM (starter 버전 정합성만 관리; SDK 버전은 아래에서 별도 BOM으로 고정)
+    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.0.2')
 
+    // starter가 끌고오는 software.amazon.awssdk(구버전)를 제외하고, 아래에서 우리가 지정한 BOM 버전을 사용
+    implementation('io.awspring.cloud:spring-cloud-aws-starter-sqs') {
+        exclude group: 'software.amazon.awssdk'
+    }
+
+    // --- AWS SDK v2 : BOM으로 2.25.62 고정 (충돌 방지) ---
+    implementation platform('software.amazon.awssdk:bom:2.25.62')
+
+    // 필요한 서비스 클라이언트 모듈들 (버전 표기 금지: BOM이 관리)
+    implementation 'software.amazon.awssdk:sqs'
+    implementation 'software.amazon.awssdk:cloudwatch'
+    implementation 'software.amazon.awssdk:cloudwatchlogs'
+
+    // 필요 시 추가 예: implementation 'software.amazon.awssdk:sts' 등
 }
 
 tasks.named('test') {
