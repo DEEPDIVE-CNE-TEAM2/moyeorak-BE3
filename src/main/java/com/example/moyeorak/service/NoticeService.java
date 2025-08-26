@@ -4,7 +4,6 @@ import com.example.moyeorak.dto.NoticeDto;
 import com.example.moyeorak.dto.NoticeRequest;
 import com.example.moyeorak.entity.Notice;
 import com.example.moyeorak.entity.Region;
-import com.example.moyeorak.entity.User;
 import com.example.moyeorak.repository.NoticeRepository;
 import com.example.moyeorak.repository.RegionRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -19,6 +18,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class NoticeService {
 
     private final NoticeRepository noticeRepository;
@@ -27,14 +27,16 @@ public class NoticeService {
     // ======================== 생성 ========================
 
     @Transactional
-    public NoticeDto create(User author, NoticeRequest request) {
+    public NoticeDto create(Long authorId, NoticeRequest request) {
         log.info("[CREATE] 공지 생성 요청 - title: {}, regionId: {}, authorId: {}",
-                request.getTitle(), request.getRegionId(), author.getId());
+                request.getTitle(), request.getRegionId(), authorId);
 
         Region region = regionRepository.findById(request.getRegionId())
                 .orElseThrow(() -> new IllegalArgumentException("지역 정보가 존재하지 않습니다."));
 
-        if (!region.getManager().getId().equals(author.getId())) {
+        // 권한 체크: 해당 지역 관리자만 작성 가능
+        Long managerId = region.getManagerId();
+        if (managerId == null || !managerId.equals(authorId)) {
             throw new IllegalArgumentException("해당 지역의 관리자만 공지를 작성할 수 있습니다.");
         }
 
@@ -42,7 +44,7 @@ public class NoticeService {
                 .title(request.getTitle())
                 .content(request.getContent())
                 .region(region)
-                .author(author)
+                .authorId(authorId)
                 .build();
 
         return toDto(noticeRepository.save(notice));
@@ -59,13 +61,14 @@ public class NoticeService {
     public NoticeDto getNoticeAndIncreaseViewCount(Long id) {
         log.info("[GET] 공지 조회 및 조회수 증가 요청 - id: {}", id);
         Notice notice = findNotice(id);
+        // 단순 증가 (고동시성 환경이면 @Modifying 쿼리로 원자적 증가 권장)
         notice.setViewCount(notice.getViewCount() + 1);
         return toDto(notice);
     }
 
     public List<NoticeDto> getNoticesByRegionId(Long regionId) {
         log.info("[GET] 지역별 공지 목록 조회 - regionId: {}", regionId);
-        return noticeRepository.findByRegionId(regionId).stream()
+        return noticeRepository.findByRegion_Id(regionId).stream()
                 .map(this::toDto)
                 .toList();
     }
@@ -73,7 +76,7 @@ public class NoticeService {
     public NoticeDto getNoticeByRegion(Long noticeId, Long regionId) {
         log.info("[GET] 지역별 공지 단건 조회 요청 - regionId: {}, noticeId: {}", regionId, noticeId);
 
-        Notice notice = noticeRepository.findByIdAndRegionId(noticeId, regionId)
+        Notice notice = noticeRepository.findByIdAndRegion_Id(noticeId, regionId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 지역에 공지사항이 존재하지 않습니다."));
 
         return toDto(notice);
@@ -94,7 +97,7 @@ public class NoticeService {
 
         Notice notice = findNotice(noticeId);
 
-        if (!notice.getAuthor().getId().equals(userId)) {
+        if (!notice.getAuthorId().equals(userId)) {
             throw new AccessDeniedException("수정 권한이 없습니다.");
         }
 
@@ -112,7 +115,7 @@ public class NoticeService {
 
         Notice notice = findNotice(id);
 
-        if (!notice.getAuthor().getId().equals(userId)) {
+        if (!notice.getAuthorId().equals(userId)) {
             throw new AccessDeniedException("삭제 권한이 없습니다.");
         }
 

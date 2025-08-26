@@ -8,7 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class FacilityResponse {
-    private Integer id;
+    private Long id;
     private String location;
     private String address;
     private Integer capacity;

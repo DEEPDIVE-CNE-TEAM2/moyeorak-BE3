@@ -3,6 +3,10 @@ package com.example.moyeorak.dto;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * 시설 수정 요청 DTO
+ * - 부분 업데이트에 사용됨
+ */
 @Getter
 @Setter
 public class FacilityUpdateDto {
@@ -13,7 +17,7 @@ public class FacilityUpdateDto {
     private Integer capacity;
     private String description;
     private String location;
-    private Integer regionId;
+    private Long regionId;
     private Integer area;
     private String usageStartTime;
     private String usageEndTime;

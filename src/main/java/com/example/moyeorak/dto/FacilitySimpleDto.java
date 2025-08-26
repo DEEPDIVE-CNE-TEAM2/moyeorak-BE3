@@ -16,4 +16,3 @@ public class FacilitySimpleDto {
     private String imageUrl;
     private Integer area;
 }
-

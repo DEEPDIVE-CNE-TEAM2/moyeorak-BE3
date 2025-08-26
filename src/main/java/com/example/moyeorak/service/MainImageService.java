@@ -4,7 +4,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.moyeorak.dto.MainImageRequest;
 import com.example.moyeorak.dto.MainImageResponse;
 import com.example.moyeorak.entity.MainImage;
-import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.repository.MainImageRepository;
 import com.example.moyeorak.repository.RegionRepository;
 import jakarta.validation.Valid;
@@ -22,10 +21,15 @@ public class MainImageService {
 
     @Transactional
     public MainImageResponse create(@Valid MainImageRequest request) {
-        Region region = regionRepository.findById(request.regionId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역입니다."));
+        Long regionId = request.regionId();
 
-        if (mainImageRepository.existsByRegionIdAndDisplayOrder(region.getId(), request.displayOrder())) {
+        // 지역 존재 여부 검증
+        if (!regionRepository.existsById(regionId)) {
+            throw new IllegalArgumentException("존재하지 않는 지역입니다.");
+        }
+
+        // 순서 중복 체크
+        if (mainImageRepository.existsByRegionIdAndDisplayOrder(regionId, request.displayOrder())) {
             throw new IllegalArgumentException("해당 지역에 이미 사용 중인 노출 순서입니다.");
         }
 
@@ -34,7 +38,7 @@ public class MainImageService {
                 .imageUrl(request.imageUrl())
                 .displayOrder(request.displayOrder())
                 .isActive(request.isActive() != null && request.isActive())
-                .region(region)
+                .regionId(regionId) // ✅ Region 엔티티 대신 ID 값만 저장
                 .build();
 
         return MainImageResponse.from(mainImageRepository.save(image));
@@ -52,10 +56,10 @@ public class MainImageService {
         MainImage image = mainImageRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("이미지를 찾을 수 없습니다."));
 
-        // ✅ null 체크: displayOrder가 바뀌었을 때만 중복 체크
+        // ✅ 순서 변경 시 중복 체크
         if (request.displayOrder() != null &&
                 !image.getDisplayOrder().equals(request.displayOrder()) &&
-                mainImageRepository.existsByRegionIdAndDisplayOrder(image.getRegion().getId(), request.displayOrder())) {
+                mainImageRepository.existsByRegionIdAndDisplayOrder(image.getRegionId(), request.displayOrder())) {
             throw new IllegalArgumentException("해당 지역에 이미 사용 중인 노출 순서입니다.");
         }
 

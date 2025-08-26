@@ -31,7 +31,7 @@ public class ProgramRequest {
     @NotBlank
     private String instructorName;
 
-    private String status;
+    private String status; // "OPEN", "CLOSED"
 
     @NotNull
     private LocalDate usageStartDate;

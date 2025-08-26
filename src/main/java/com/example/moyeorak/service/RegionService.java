@@ -4,9 +4,7 @@ import com.example.moyeorak.dto.RegionRequest;
 import com.example.moyeorak.dto.RegionResponse;
 import com.example.moyeorak.dto.MessageResponse;
 import com.example.moyeorak.entity.Region;
-import com.example.moyeorak.entity.User;
 import com.example.moyeorak.repository.RegionRepository;
-import com.example.moyeorak.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,8 +19,8 @@ import java.util.List;
 public class RegionService {
 
     private final RegionRepository regionRepository;
-    private final UserRepository userRepository;
 
+    // ======================== 생성 ========================
     @Transactional
     public RegionResponse createRegion(RegionRequest request) {
         log.info("[CREATE] 지역 생성 요청: {}", request);
@@ -31,12 +29,13 @@ public class RegionService {
 
         Region region = Region.builder()
                 .name(request.getName())
-                .manager(resolveManager(request.getManagerId()))
+                .managerId(request.getManagerId()) // ✅ User 참조 대신 managerId 값만 저장
                 .build();
 
         return toResponse(regionRepository.save(region));
     }
 
+    // ======================== 조회 ========================
     public List<RegionResponse> getAllRegions() {
         log.info("[GET] 전체 지역 목록 조회");
 
@@ -47,11 +46,11 @@ public class RegionService {
 
     public RegionResponse getRegion(Long id) {
         log.info("[GET] 지역 상세 조회 - ID: {}", id);
-
         Region region = findRegionById(id);
         return toResponse(region);
     }
 
+    // ======================== 수정 ========================
     @Transactional
     public RegionResponse updateRegion(Long id, RegionRequest request) {
         log.info("[PUT] 지역 수정 요청 - ID: {}", id);
@@ -63,11 +62,12 @@ public class RegionService {
         }
 
         region.setName(request.getName());
-        region.setManager(resolveManager(request.getManagerId()));
+        region.setManagerId(request.getManagerId());
 
         return toResponse(region);
     }
 
+    // ======================== 삭제 ========================
     @Transactional
     public MessageResponse deleteRegion(Long id) {
         log.info("[DELETE] 지역 삭제 요청 - ID: {}", id);
@@ -80,7 +80,7 @@ public class RegionService {
         return new MessageResponse("지역이 삭제되었습니다.");
     }
 
-
+    // ======================== 내부 유틸 ========================
     private Region findRegionById(Long id) {
         return regionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + id + ")이 존재하지 않습니다."));
@@ -92,34 +92,11 @@ public class RegionService {
         }
     }
 
-    private User resolveManager(Long managerId) {
-        if (managerId == null) {
-            log.info("지역 생성/수정 시 관리자 지정 없이 요청됨");
-            return null;
-        }
-
-        return userRepository.findById(managerId)
-                .filter(user -> "ADMIN".equals(user.getRole().name()))
-                .orElseThrow(() -> new IllegalArgumentException("관리자 ID(" + managerId + ")가 없거나 ADMIN 권한이 아닙니다."));
-    }
-
     private RegionResponse toResponse(Region region) {
-        RegionResponse.ManagerDto managerDto = null;
-
-        if (region.getManager() != null) {
-            User manager = region.getManager();
-            managerDto = RegionResponse.ManagerDto.builder()
-                    .id(manager.getId())
-                    .name(manager.getName())
-                    .email(manager.getEmail())
-                    .build();
-        }
-
         return RegionResponse.builder()
                 .id(region.getId())
                 .name(region.getName())
-                .manager(managerDto)
+                .managerId(region.getManagerId()) // ✅ managerId만 내려줌
                 .build();
     }
-
 }

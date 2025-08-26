@@ -30,4 +30,6 @@ public class ProgramResponse {
     private String contact;
     private String imageUrl;
     private String description;
+    private Long regionId;
+    private Long facilityId;
 }

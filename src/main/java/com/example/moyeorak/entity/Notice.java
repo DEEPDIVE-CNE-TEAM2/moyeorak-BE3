@@ -1,15 +1,21 @@
 package com.example.moyeorak.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "notices")
+@Table(
+        name = "notices",
+        indexes = {
+                @Index(name = "idx_notices_region", columnList = "region_id"),
+                @Index(name = "idx_notices_created_at", columnList = "created_at")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,23 +35,22 @@ public class Notice {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 
     @Builder.Default
     @Column(name = "view_count", nullable = false)
     private int viewCount = 0;
 
-    @ManyToOne(optional = true)
-    @JoinColumn(name = "author_id", foreignKey = @ForeignKey(name = "fk_notice_author"))
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private User author;
+    // ✅ Auth(User) 연관 제거 → 단순 FK 값만 저장
+    @Column(name = "author_id")
+    private Long authorId;
 
-    @ManyToOne(optional = false)
+    // ✅ Region 은 content 소속이라 유지 가능
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "region_id", nullable = false, foreignKey = @ForeignKey(name = "fk_notice_region"))
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Region region;
 }

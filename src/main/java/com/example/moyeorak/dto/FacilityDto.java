@@ -23,4 +23,3 @@ public class FacilityDto {
     private LocalTime usageEndTime;
     private Integer area;
 }
-

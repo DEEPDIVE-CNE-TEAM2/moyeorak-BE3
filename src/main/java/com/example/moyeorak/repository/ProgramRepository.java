@@ -1,7 +1,6 @@
 package com.example.moyeorak.repository;
 
 import com.example.moyeorak.entity.Program;
-import com.example.moyeorak.entity.Region;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
@@ -11,20 +10,16 @@ import java.util.Optional;
 
 public interface ProgramRepository extends JpaRepository<Program, Long> {
 
-    // ✅ 프로그램 중복 체크용 - Facility의 name을 기준으로 검색
-    Optional<Program> findByTitleAndFacility_NameAndUsageStartDateAndUsageEndDateAndClassStartTimeAndClassEndTime(
+    Optional<Program> findByTitleAndFacilityIdAndUsageStartDateAndUsageEndDateAndClassStartTimeAndClassEndTime(
             String title,
-            String facilityName,
+            Long facilityId,
             LocalDate usageStartDate,
             LocalDate usageEndDate,
             LocalTime classStartTime,
             LocalTime classEndTime
     );
 
-    // ✅ 지역별 프로그램 목록 조회
-    List<Program> findByRegion_Id(Long regionId);
+    List<Program> findByRegionId(Long regionId);
 
-    // 관리자 프로그램 조회 사용
-    List<Program> findByRegion(Region region);
-    List<Program> findByRegionAndTitleContainingIgnoreCase(Region region, String title);
+    List<Program> findByRegionIdAndTitleContainingIgnoreCase(Long regionId, String title);
 }

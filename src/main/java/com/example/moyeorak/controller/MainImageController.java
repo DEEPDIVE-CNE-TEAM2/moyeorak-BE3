@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/main-images")
+@RequestMapping("/api/content/main-images")
 @RequiredArgsConstructor
 @Slf4j
 public class MainImageController {

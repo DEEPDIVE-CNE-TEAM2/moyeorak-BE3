@@ -1,8 +1,10 @@
 package com.example.moyeorak.service;
 
-import com.example.moyeorak.dto.*;
-import com.example.moyeorak.entity.*;
-import com.example.moyeorak.repository.*;
+import com.example.moyeorak.dto.ProgramDisplayResponse;
+import com.example.moyeorak.dto.ProgramRequest;
+import com.example.moyeorak.dto.MessageResponse;
+import com.example.moyeorak.entity.Program;
+import com.example.moyeorak.repository.ProgramRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,169 +24,18 @@ import java.util.*;
 public class ProgramService {
 
     private final ProgramRepository programRepository;
-    private final RegionRepository regionRepository;
-    private final FacilityRepository facilityRepository;
-    private final UserRepository userRepository;
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Transactional
     public ProgramDisplayResponse createProgram(ProgramRequest dto) {
-        log.info("[CREATE] 추가 등록: {}", dto);
-        validateDuplicateTitle(dto.getTitle());
-        Program program = buildProgramFromDto(dto);
-        return toDisplayResponse(programRepository.save(program), null);
-    }
+        log.info("[CREATE] 프로그램 등록: {}", dto);
 
-    public List<ProgramDisplayResponse> getAllPrograms(Long userId) {
-        User user = getUser(userId);
-        log.info("[GET] 전체 공정 목록 - userId: {}", userId);
-        return programRepository.findAll().stream()
-                .map(p -> toDisplayResponse(p, user))
-                .toList();
-    }
+        validateDuplicate(dto);
 
-    public List<ProgramDisplayResponse> getProgramsByRegion(Long regionId, Long userId) {
-        User user = getUser(userId);
-        log.info("[GET] 지역 별 공정 목록 - regionId: {}, userId: {}", regionId, userId);
-        return programRepository.findByRegion_Id(regionId).stream()
-                .map(p -> toDisplayResponse(p, user))
-                .toList();
-    }
-
-    public ProgramDisplayResponse getProgramById(Long id, Long userId) {
-        User user = getUser(userId);
-        log.info("[GET] 공정 상세 조회 - ID: {}, userId: {}", id, userId);
-        return toDisplayResponse(getProgram(id), user);
-    }
-
-    @Transactional
-    public ProgramDisplayResponse partialUpdateProgram(Long id, Map<String, Object> updates) {
-        log.info("[PATCH] 공정 부분 수정 - ID: {}", id);
-        Program program = getProgram(id);
-
-        Set<String> allowedFields = Set.of(
-                "title", "regionId", "facilityId", "category", "target", "instructorName", "status",
-                "usageStartDate", "usageEndDate", "classStartTime", "classEndTime",
-                "registrationStartDate", "registrationEndDate", "cancelEndDate",
-                "inPrice", "outPrice", "capacity", "contact", "imageUrl", "description"
-        );
-
-        updates.forEach((fieldName, value) -> {
-            if (!allowedFields.contains(fieldName)) return;
-            try {
-                switch (fieldName) {
-                    case "regionId" -> program.setRegion(getRegion(Long.parseLong(value.toString())));
-                    case "facilityId" -> program.setFacility(getFacility(Long.parseLong(value.toString())));
-                    case "status" -> program.setStatus("closed".equalsIgnoreCase(value.toString()) ? Program.Status.CLOSED : Program.Status.OPEN);
-                    case "usageStartDate", "usageEndDate", "registrationStartDate", "registrationEndDate", "cancelEndDate" -> {
-                        Field field = Program.class.getDeclaredField(fieldName);
-                        field.setAccessible(true);
-                        field.set(program, LocalDate.parse(value.toString()));
-                    }
-                    case "classStartTime", "classEndTime" -> {
-                        Field field = Program.class.getDeclaredField(fieldName);
-                        field.setAccessible(true);
-                        field.set(program, LocalTime.parse(value.toString()));
-                    }
-                    default -> {
-                        Field field = Program.class.getDeclaredField(fieldName);
-                        field.setAccessible(true);
-                        Object parsed = field.getType().equals(Integer.class)
-                                ? Integer.parseInt(value.toString())
-                                : value;
-                        field.set(program, parsed);
-                    }
-                }
-            } catch (Exception e) {
-                throw new RuntimeException("필드 업데이트 실패: " + fieldName + " - " + e.getMessage(), e);
-            }
-        });
-
-        // ✅ 지역-시설 일치 여부 검증
-        if (program.getRegion() != null && program.getFacility() != null) {
-            Long regionId = program.getRegion().getId();
-            Long facilityRegionId = program.getFacility().getRegion().getId();
-            if (!Objects.equals(regionId, facilityRegionId)) {
-                throw new IllegalArgumentException("선택한 시설이 해당 지역에 속하지 않습니다.");
-            }
-        }
-
-        return toDisplayResponse(program, null);
-    }
-
-    @Transactional
-    public MessageResponse deleteProgram(Long id) {
-        log.info("[DELETE] 공정 삭제 - ID: {}", id);
-        if (!programRepository.existsById(id)) {
-            throw new IllegalArgumentException("삭제할 공정이 없습니다.");
-        }
-        programRepository.deleteById(id);
-        return new MessageResponse("공정이 삭제되었습니다.");
-    }
-
-    private void validateDuplicateTitle(String title) {
-        boolean exists = programRepository.findAll().stream()
-                .anyMatch(program -> program.getTitle().equalsIgnoreCase(title));
-        if (exists) {
-            throw new IllegalArgumentException("이미 존재하는 공정 제목입니다.");
-        }
-    }
-
-    private Program getProgram(Long id) {
-        return programRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("공정(ID: " + id + ")이 존재하지 않습니다."));
-    }
-
-    private Region getRegion(Long regionId) {
-        return regionRepository.findById(regionId)
-                .orElseThrow(() -> new IllegalArgumentException("지역(ID: " + regionId + ")이 존재하지 않습니다."));
-    }
-
-    private Facility getFacility(Long facilityId) {
-        return facilityRepository.findById(facilityId)
-                .orElseThrow(() -> new IllegalArgumentException("시설(ID: " + facilityId + ")이 존재하지 않습니다."));
-    }
-
-    private User getUser(Long userId) {
-        if (userId == null) return null;
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 없습니다."));
-    }
-
-    public boolean isAsyncPeriod(Long programId) {
-        Program program = programRepository.findById(programId)
-                .orElseThrow(() -> new IllegalArgumentException("프로그램을 찾을 수 없습니다."));
-
-        LocalDate registrationDate = program.getRegistrationStartDate();
-        if (registrationDate == null) {
-            log.warn("[isAsyncPeriod] registration_start_date가 null입니다. programId={}", programId);
-            return false;
-        }
-
-        LocalDateTime now = LocalDateTime.now(KST);
-        LocalDateTime start = registrationDate.atTime(9, 0);
-        LocalDateTime end = registrationDate.atTime(10, 0);
-
-        boolean result = now.isAfter(start) && now.isBefore(end);
-        log.info("[isAsyncPeriod] programId={}, now={}, start={}, end={}, isAsync={}",
-                programId, now, start, end, result);
-
-        return result;
-    }
-
-    private Program buildProgramFromDto(ProgramRequest dto) {
-        Region region = getRegion(dto.getRegionId());
-        Facility facility = getFacility(dto.getFacilityId());
-
-        // ✅ 지역-시설 일치 여부 검증
-        if (!Objects.equals(region.getId(), facility.getRegion().getId())) {
-            throw new IllegalArgumentException("선택한 시설이 해당 지역에 속하지 않습니다.");
-        }
-
-        return Program.builder()
+        Program program = Program.builder()
                 .title(dto.getTitle())
-                .region(region)
-                .facility(facility)
+                .regionId(dto.getRegionId())
+                .facilityId(dto.getFacilityId())
                 .category(dto.getCategory())
                 .target(dto.getTarget())
                 .instructorName(dto.getInstructorName())
@@ -203,35 +54,133 @@ public class ProgramService {
                 .imageUrl(dto.getImageUrl())
                 .description(dto.getDescription())
                 .build();
+
+        return toDisplayResponse(programRepository.save(program), null);
     }
 
-    private ProgramDisplayResponse toDisplayResponse(Program program, User user) {
-        boolean inRegion = false;
-        Long userRegionId = null;
-        Long programRegionId = null;
+    public List<ProgramDisplayResponse> getAllPrograms(Long userRegionId) {
+        log.info("[GET] 전체 프로그램 조회 - userRegionId: {}", userRegionId);
+        return programRepository.findAll().stream()
+                .map(p -> toDisplayResponse(p, userRegionId))
+                .toList();
+    }
 
-        if (user != null) {
-            userRegionId = Optional.ofNullable(user.getRegion()).map(Region::getId).orElse(null);
-        }
-        if (program.getRegion() != null) {
-            programRegionId = program.getRegion().getId();
-        }
+    public List<ProgramDisplayResponse> getProgramsByRegion(Long regionId, Long userRegionId) {
+        log.info("[GET] 지역별 프로그램 조회 - regionId: {}, userRegionId: {}", regionId, userRegionId);
+        return programRepository.findByRegionId(regionId).stream()
+                .map(p -> toDisplayResponse(p, userRegionId))
+                .toList();
+    }
 
-        inRegion = Objects.equals(userRegionId, programRegionId);
+    public ProgramDisplayResponse getProgramById(Long id, Long userRegionId) {
+        log.info("[GET] 프로그램 상세 조회 - ID: {}, userRegionId: {}", id, userRegionId);
+        return toDisplayResponse(getProgram(id), userRegionId);
+    }
 
-        // ✅ 불일치 로그 출력
-        if (program.getFacility() != null && program.getFacility().getRegion() != null && program.getRegion() != null) {
-            Long facilityRegionId = program.getFacility().getRegion().getId();
-            if (!facilityRegionId.equals(programRegionId)) {
-                log.warn("[불일치] 프로그램과 시설의 지역ID 다름 - programId: {}, program.regionId: {}, facility.regionId: {}",
-                        program.getId(), programRegionId, facilityRegionId);
+    @Transactional
+    public ProgramDisplayResponse partialUpdateProgram(Long id, Map<String, Object> updates) {
+        log.info("[PATCH] 프로그램 부분 수정 - ID: {}", id);
+        Program program = getProgram(id);
+
+        Set<String> allowedFields = Set.of(
+                "title", "regionId", "facilityId", "category", "target", "instructorName", "status",
+                "usageStartDate", "usageEndDate", "classStartTime", "classEndTime",
+                "registrationStartDate", "registrationEndDate", "cancelEndDate",
+                "inPrice", "outPrice", "capacity", "contact", "imageUrl", "description"
+        );
+
+        updates.forEach((fieldName, value) -> {
+            if (!allowedFields.contains(fieldName)) return;
+            try {
+                switch (fieldName) {
+                    case "status" -> program.setStatus("closed".equalsIgnoreCase(value.toString())
+                            ? Program.Status.CLOSED : Program.Status.OPEN);
+                    case "usageStartDate", "usageEndDate", "registrationStartDate",
+                         "registrationEndDate", "cancelEndDate" -> {
+                        Field field = Program.class.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        field.set(program, LocalDate.parse(value.toString()));
+                    }
+                    case "classStartTime", "classEndTime" -> {
+                        Field field = Program.class.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        field.set(program, LocalTime.parse(value.toString()));
+                    }
+                    case "regionId", "facilityId" -> {
+                        Field field = Program.class.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        field.set(program, Long.parseLong(value.toString()));
+                    }
+                    default -> {
+                        Field field = Program.class.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        Object parsed = field.getType().equals(Integer.class)
+                                ? Integer.parseInt(value.toString())
+                                : value;
+                        field.set(program, parsed);
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("필드 업데이트 실패: " + fieldName + " - " + e.getMessage(), e);
             }
+        });
+
+        return toDisplayResponse(program, null);
+    }
+
+    @Transactional
+    public void deleteProgram(Long id) {
+        log.info("[DELETE] 프로그램 삭제 - ID: {}", id);
+        if (!programRepository.existsById(id)) {
+            throw new IllegalArgumentException("삭제할 프로그램이 없습니다.");
         }
+        programRepository.deleteById(id);
+    }
+
+    private void validateDuplicate(ProgramRequest dto) {
+        programRepository.findByTitleAndFacilityIdAndUsageStartDateAndUsageEndDateAndClassStartTimeAndClassEndTime(
+                dto.getTitle(),
+                dto.getFacilityId(),
+                dto.getUsageStartDate(),
+                dto.getUsageEndDate(),
+                dto.getClassStartTime(),
+                dto.getClassEndTime()
+        ).ifPresent(p -> {
+            throw new IllegalArgumentException("이미 동일한 조건의 프로그램이 존재합니다.");
+        });
+    }
+
+    private Program getProgram(Long id) {
+        return programRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("프로그램(ID: " + id + ")이 존재하지 않습니다."));
+    }
+
+    public boolean isAsyncPeriod(Long programId) {
+        Program program = getProgram(programId);
+
+        LocalDate registrationDate = program.getRegistrationStartDate();
+        if (registrationDate == null) {
+            log.warn("[isAsyncPeriod] registration_start_date가 null입니다. programId={}", programId);
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now(KST);
+        LocalDateTime start = registrationDate.atTime(9, 0);
+        LocalDateTime end = registrationDate.atTime(10, 0);
+
+        boolean result = now.isAfter(start) && now.isBefore(end);
+        log.info("[isAsyncPeriod] programId={}, now={}, start={}, end={}, isAsync={}",
+                programId, now, start, end, result);
+
+        return result;
+    }
+
+    private ProgramDisplayResponse toDisplayResponse(Program program, Long userRegionId) {
+        boolean inRegion = Objects.equals(userRegionId, program.getRegionId());
 
         return ProgramDisplayResponse.builder()
                 .id(program.getId())
                 .title(program.getTitle())
-                .location(program.getFacility().getName())
                 .target(program.getTarget())
                 .usagePeriod(formatDateRange(program.getUsageStartDate(), program.getUsageEndDate()))
                 .classTime(formatTimeRange(program.getClassStartTime(), program.getClassEndTime()))
@@ -245,8 +194,10 @@ public class ProgramService {
                 .contact(program.getContact())
                 .description(program.getDescription())
                 .imageUrl(program.getImageUrl())
-                .regionId(program.getRegion().getId())
+                .regionId(program.getRegionId())
+                .facilityId(program.getFacilityId())
                 .instructorName(program.getInstructorName())
+                .status(program.getStatus().name())
                 .build();
     }
 

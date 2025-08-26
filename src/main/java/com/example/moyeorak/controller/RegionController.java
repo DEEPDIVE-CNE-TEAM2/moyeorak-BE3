@@ -16,12 +16,14 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/regions")
+@RequestMapping("/api/content/regions")
 public class RegionController {
 
     private final RegionService regionService;
 
-    // 📌 지역 생성 (관리자만)
+    /**
+     * 📌 지역 생성 (ADMIN 전용)
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RegionResponse> createRegion(@Valid @RequestBody RegionRequest request) {
@@ -30,21 +32,27 @@ public class RegionController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    // 📌 전체 지역 목록 조회
+    /**
+     * 📌 전체 지역 목록 조회
+     */
     @GetMapping
     public ResponseEntity<List<RegionResponse>> getAllRegions() {
         log.info("[GET] 전체 지역 목록 조회");
         return ResponseEntity.ok(regionService.getAllRegions());
     }
 
-    // 📌 특정 지역 상세 조회
+    /**
+     * 📌 특정 지역 상세 조회
+     */
     @GetMapping("/{id}")
     public ResponseEntity<RegionResponse> getRegionById(@PathVariable Long id) {
         log.info("[GET] 지역 상세 조회 - ID: {}", id);
         return ResponseEntity.ok(regionService.getRegion(id));
     }
 
-    // 📌 지역 정보 수정 (관리자만)
+    /**
+     * 📌 지역 정보 수정 (ADMIN 전용)
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RegionResponse> updateRegion(
@@ -55,7 +63,9 @@ public class RegionController {
         return ResponseEntity.ok(regionService.updateRegion(id, request));
     }
 
-    // 📌 지역 삭제 (관리자만)
+    /**
+     * 📌 지역 삭제 (ADMIN 전용)
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MessageResponse> deleteRegion(@PathVariable Long id) {
