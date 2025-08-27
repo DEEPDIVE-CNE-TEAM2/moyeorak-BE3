@@ -26,12 +26,16 @@ public class NoticeDto {
                 .id(notice.getId())
                 .title(notice.getTitle())
                 .content(notice.getContent())
-                .createdAt(notice.getCreatedAt())
-                .updatedAt(notice.getUpdatedAt())
+                .createdAt(notice.getCreatedAt() != null ? notice.getCreatedAt().toLocalDateTime() : null)
+                .updatedAt(notice.getUpdatedAt() != null ? notice.getUpdatedAt().toLocalDateTime() : null)
                 .viewCount(notice.getViewCount())
-                .authorName(notice.getAuthor() != null ? notice.getAuthor().getName() : null)
-                .regionName(notice.getRegion() != null ? notice.getRegion().getName() : null)
-                .regionId(notice.getRegion().getId())
+                // 엔티티에 작성자/지역 이름 필드가 없으면 null 유지
+                .authorName(null)
+                .regionName(null)
+                // 현재는 연관으로부터 ID 추출
+                .regionId(notice.getRegion() != null ? notice.getRegion().getId() : null)
+                // 엔티티를 MAS(FK 전용)로 바꾸면 아래로 교체
+                // .regionId(notice.getRegionId())
                 .build();
     }
 }

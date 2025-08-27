@@ -1,33 +1,37 @@
 package com.example.moyeorak.service.admin;
 
-import com.example.moyeorak.dto.admin.*;
-import com.example.moyeorak.entity.*;
+import com.example.moyeorak.dto.admin.AdminFacilityCreateRequest;
+import com.example.moyeorak.dto.admin.AdminFacilityCreateResponse;
+import com.example.moyeorak.dto.admin.AdminFacilityDetailResponse;
+import com.example.moyeorak.dto.admin.AdminFacilityListResponse;
+import com.example.moyeorak.dto.admin.AdminFacilityUpdateRequest;
+import com.example.moyeorak.entity.Facility;
+import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.exception.BusinessException;
 import com.example.moyeorak.exception.ErrorCode;
 import com.example.moyeorak.repository.FacilityRepository;
 import com.example.moyeorak.repository.RegionRepository;
-import com.example.moyeorak.security.AdminAuthHelper;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AdminFacilityService {
 
     private final FacilityRepository facilityRepository;
     private final RegionRepository regionRepository;
-    private final AdminAuthHelper adminAuthHelper;
 
-
+    /** 시설 생성 */
     @Transactional
-    public AdminFacilityCreateResponse createFacility(AdminFacilityCreateRequest request, HttpServletRequest httpRequest) {
-        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
-        Region region = admin.getRegion();
+    public AdminFacilityCreateResponse createFacility(AdminFacilityCreateRequest request, Long userId, Long regionId) {
+        Region region = regionRepository.findById(regionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+        assertRegionManager(userId, region);
 
         Facility facility = Facility.builder()
                 .name(request.getName())
@@ -37,101 +41,116 @@ public class AdminFacilityService {
                 .imageUrl(request.getImageUrl())
                 .capacity(request.getCapacity())
                 .description(request.getDescription())
-                .region(region)
                 .area(request.getArea())
-                .usageStartTime(LocalTime.parse(request.getUsageStartTime()))
-                .usageEndTime(LocalTime.parse(request.getUsageEndTime()))
+                .usageStartTime(parseTime(request.getUsageStartTime()))
+                .usageEndTime(parseTime(request.getUsageEndTime()))
+                .regionId(region.getId())   // FK만 세팅
                 .build();
 
         Facility saved = facilityRepository.save(facility);
         return AdminFacilityCreateResponse.from(saved);
     }
 
-    // 시설 리스트 조회
-    @Transactional(readOnly = true)
-    public List<AdminFacilityListResponse> getFacilityList(HttpServletRequest httpRequest) {
-        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
-        Region region = admin.getRegion();
+    /** 시설 목록 조회 (지역 단위) */
+    public List<AdminFacilityListResponse> getFacilityList(Long userId, Long regionId) {
+        Region region = regionRepository.findById(regionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+        assertRegionManager(userId, region);
 
-        List<Facility> facilities = facilityRepository.findByRegion(region);
-
-        return facilities.stream()
-                .map(facility -> AdminFacilityListResponse.builder()
-                        .id(facility.getId())
-                        .name(facility.getName())
-                        .address(facility.getAddress())
-                        .contact(facility.getContact())
-                        .capacity(facility.getCapacity())
+        return facilityRepository.findByRegionId(regionId).stream()
+                .map(f -> AdminFacilityListResponse.builder()
+                        .id(f.getId())
+                        .name(f.getName())
+                        .address(f.getAddress())
+                        .contact(f.getContact())
+                        .capacity(f.getCapacity())
                         .build())
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public AdminFacilityDetailResponse getFacilityDetail(Long facilityId, HttpServletRequest httpRequest) {
-        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
-        Facility facility = facilityRepository.findById(facilityId)
+    /** 시설 상세 조회 */
+    public AdminFacilityDetailResponse getFacilityDetail(Long facilityId, Long userId) {
+        Facility f = facilityRepository.findById(facilityId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
-
-        if (!facility.getRegion().equals(admin.getRegion())) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
-        }
+        assertRegionManagerByRegionId(userId, f.getRegionId());
 
         return AdminFacilityDetailResponse.builder()
-                .id(facility.getId())
-                .name(facility.getName())
-                .address(facility.getAddress())
-                .usageStartTime(facility.getUsageStartTime().toString())
-                .usageEndTime(facility.getUsageEndTime().toString())
-                .contact(facility.getContact())
-                .capacity(facility.getCapacity())
-                .description(facility.getDescription())
-                .imageUrl(facility.getImageUrl())
+                .id(f.getId())
+                .name(f.getName())
+                .address(f.getAddress())
+                .usageStartTime(toStringOrNull(f.getUsageStartTime()))
+                .usageEndTime(toStringOrNull(f.getUsageEndTime()))
+                .contact(f.getContact())
+                .capacity(f.getCapacity())
+                .description(f.getDescription())
+                .imageUrl(f.getImageUrl())
                 .build();
     }
 
-    // 수정
+    /** 시설 수정 */
     @Transactional
-    public AdminFacilityDetailResponse updateFacility(Long facilityId, AdminFacilityUpdateRequest request, HttpServletRequest httpRequest) {
-        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
-        Facility facility = facilityRepository.findById(facilityId)
+    public AdminFacilityDetailResponse updateFacility(Long facilityId, AdminFacilityUpdateRequest request, Long userId) {
+        Facility f = facilityRepository.findById(facilityId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
+        assertRegionManagerByRegionId(userId, f.getRegionId());
 
-        if (!facility.getRegion().equals(admin.getRegion())) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
-        }
-
-        facility.setName(request.getName());
-        facility.setAddress(request.getAddress());
-        facility.setUsageStartTime(LocalTime.parse(request.getUsageStartTime()));
-        facility.setUsageEndTime(LocalTime.parse(request.getUsageEndTime()));
-        facility.setContact(request.getContact());
-        facility.setCapacity(request.getCapacity());
-        facility.setDescription(request.getDescription());
-        facility.setImageUrl(request.getImageUrl());
+        f.setName(request.getName());
+        f.setAddress(request.getAddress());
+        f.setUsageStartTime(parseTime(request.getUsageStartTime()));
+        f.setUsageEndTime(parseTime(request.getUsageEndTime()));
+        f.setContact(request.getContact());
+        f.setCapacity(request.getCapacity());
+        f.setDescription(request.getDescription());
+        f.setImageUrl(request.getImageUrl());
 
         return AdminFacilityDetailResponse.builder()
-                .id(facility.getId())
-                .name(facility.getName())
-                .address(facility.getAddress())
-                .usageStartTime(facility.getUsageStartTime().toString())
-                .usageEndTime(facility.getUsageEndTime().toString())
-                .contact(facility.getContact())
-                .capacity(facility.getCapacity())
-                .description(facility.getDescription())
-                .imageUrl(facility.getImageUrl())
+                .id(f.getId())
+                .name(f.getName())
+                .address(f.getAddress())
+                .usageStartTime(toStringOrNull(f.getUsageStartTime()))
+                .usageEndTime(toStringOrNull(f.getUsageEndTime()))
+                .contact(f.getContact())
+                .capacity(f.getCapacity())
+                .description(f.getDescription())
+                .imageUrl(f.getImageUrl())
                 .build();
     }
 
+    /** 시설 삭제 */
     @Transactional
-    public void deleteFacility(Long facilityId, HttpServletRequest httpRequest) {
-        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
-        Facility facility = facilityRepository.findById(facilityId)
+    public void deleteFacility(Long facilityId, Long userId) {
+        Facility f = facilityRepository.findById(facilityId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
-
-        if (!facility.getRegion().equals(admin.getRegion())) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
-        }
-        facilityRepository.delete(facility);
+        assertRegionManagerByRegionId(userId, f.getRegionId());
+        facilityRepository.delete(f);
     }
 
+    // ───────── helpers ─────────
+
+    private void assertRegionManager(Long userId, Region region) {
+        Long managerId = region.getManagerId();
+        if (managerId == null || !managerId.equals(userId)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
+        }
+    }
+
+    private void assertRegionManagerByRegionId(Long userId, Long regionId) {
+        Region region = regionRepository.findById(regionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+        assertRegionManager(userId, region);
+    }
+
+    private LocalTime parseTime(String time) {
+        if (time == null || time.isBlank()) return null;
+        try {
+            return LocalTime.parse(time);
+        } catch (Exception e) {
+            // ErrorCode에 INVALID_INPUT_VALUE가 없으므로 표준 예외로 처리
+            throw new IllegalArgumentException("Invalid time format: " + time);
+        }
+    }
+
+    private String toStringOrNull(LocalTime t) {
+        return (t == null) ? null : t.toString();
+    }
 }

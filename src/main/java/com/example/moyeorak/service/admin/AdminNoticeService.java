@@ -1,90 +1,99 @@
 package com.example.moyeorak.service.admin;
 
-import com.example.moyeorak.dto.NoticeResponse;
 import com.example.moyeorak.dto.admin.AdminNoticeListResponse;
 import com.example.moyeorak.dto.admin.AdminNoticeRequest;
 import com.example.moyeorak.dto.admin.AdminNoticeResponse;
 import com.example.moyeorak.entity.Notice;
 import com.example.moyeorak.entity.Region;
-import com.example.moyeorak.entity.User;
 import com.example.moyeorak.exception.BusinessException;
 import com.example.moyeorak.exception.ErrorCode;
-import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.repository.NoticeRepository;
-import com.example.moyeorak.repository.UserRepository;
-import com.example.moyeorak.security.AdminAuthHelper;
-import jakarta.servlet.http.HttpServletRequest;
+import com.example.moyeorak.repository.RegionRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AdminNoticeService {
 
     private final NoticeRepository noticeRepository;
-    private final AdminAuthHelper adminAuthHelper;
+    private final RegionRepository regionRepository;
 
-
-    // 공지사항 생성
+    /** 공지 생성 */
     @Transactional
-    public AdminNoticeResponse createNotice(AdminNoticeRequest dto, HttpServletRequest request) {
-        User admin = adminAuthHelper.getAdminFromRequest(request);
-        Region region = admin.getRegion();
+    public AdminNoticeResponse createNotice(AdminNoticeRequest request, Long userId, Long regionId) {
+        Region region = regionRepository.findById(regionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+
+        assertRegionManager(userId, region);
 
         Notice notice = Notice.builder()
-                .title(dto.getTitle())
-                .content(dto.getContent())
-                .author(admin)
-                .region(region)
+                .title(request.getTitle())
+                .content(request.getContent())
+                .region(region)     // Notice가 Region 연관을 보유한다고 가정
+                .authorId(userId)
                 .build();
 
-        return AdminNoticeResponse.from(noticeRepository.save(notice));
+        Notice saved = noticeRepository.save(notice);
+        return AdminNoticeResponse.from(saved);
     }
 
-    // 관리자 공지사항 리스트 조회
-    @Transactional(readOnly = true)
-    public List<AdminNoticeListResponse> getNoticeList(HttpServletRequest request) {
-        User admin = adminAuthHelper.getAdminFromRequest(request);
-        Region region = admin.getRegion();
+    /** 지역별 공지 목록 */
+    public List<AdminNoticeListResponse> getNoticeList(Long userId, Long regionId) {
+        Region region = regionRepository.findById(regionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
 
-        return noticeRepository.findByRegion(region).stream()
+        assertRegionManager(userId, region);
+
+        return noticeRepository.findByRegion_Id(regionId).stream()
                 .map(AdminNoticeListResponse::from)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    // 관리자 공지사항 상세보기
-    @Transactional(readOnly = true)
-    public AdminNoticeResponse getNoticeDetail(Long noticeId, HttpServletRequest request) {
-        adminAuthHelper.getAdminFromRequest(request);
-
+    /** 공지 상세 */
+    public AdminNoticeResponse getNoticeDetail(Long noticeId, Long userId) {
         Notice notice = noticeRepository.findById(noticeId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_NOTICE));
+                .orElseThrow(() -> new EntityNotFoundException("공지사항이 존재하지 않습니다."));
+
+        assertRegionManager(userId, notice.getRegion());
         return AdminNoticeResponse.from(notice);
     }
 
-    // 공지사항 수정하기
+    /** 공지 수정 */
     @Transactional
-    public AdminNoticeResponse updateNotice(Long noticeId, AdminNoticeRequest dto, HttpServletRequest request) {
-        adminAuthHelper.getAdminFromRequest(request);
-
+    public AdminNoticeResponse updateNotice(Long noticeId, AdminNoticeRequest request, Long userId) {
         Notice notice = noticeRepository.findById(noticeId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_NOTICE));
-        notice.setTitle(dto.getTitle());
-        notice.setContent(dto.getContent());
+                .orElseThrow(() -> new EntityNotFoundException("공지사항이 존재하지 않습니다."));
 
+        assertRegionManager(userId, notice.getRegion());
+
+        if (request.getTitle() != null)   notice.setTitle(request.getTitle());
+        if (request.getContent() != null) notice.setContent(request.getContent());
+        // dirty checking으로 저장
         return AdminNoticeResponse.from(notice);
     }
 
+    /** 공지 삭제 */
     @Transactional
-    public void deleteNotice(Long noticeId, HttpServletRequest request) {
-        adminAuthHelper.getAdminFromRequest(request);
+    public void deleteNotice(Long noticeId, Long userId) {
         Notice notice = noticeRepository.findById(noticeId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_NOTICE));
+                .orElseThrow(() -> new EntityNotFoundException("공지사항이 존재하지 않습니다."));
+
+        assertRegionManager(userId, notice.getRegion());
         noticeRepository.delete(notice);
     }
 
+    // ───────── helpers ─────────
+    private void assertRegionManager(Long userId, Region region) {
+        Long managerId = region.getManagerId();
+        if (managerId == null || !managerId.equals(userId)) {
+            // 전용 코드가 없으면 공통 권한 코드 사용
+            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
+        }
+    }
 }

@@ -17,7 +17,7 @@ public class AdminMainImageResponse {
                 .id(image.getId())
                 .imageUrl(image.getImageUrl())
                 .displayOrder(image.getDisplayOrder())
-                .isActive(image.isActive())
+                .isActive(Boolean.TRUE.equals(image.getIsActive()))
                 .build();
     }
 }

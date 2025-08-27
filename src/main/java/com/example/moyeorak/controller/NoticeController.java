@@ -3,8 +3,6 @@ package com.example.moyeorak.controller;
 import com.example.moyeorak.dto.NoticeDto;
 import com.example.moyeorak.dto.NoticeRequest;
 import com.example.moyeorak.dto.NoticeResponse;
-import com.example.moyeorak.entity.User;
-import com.example.moyeorak.repository.UserRepository;
 import com.example.moyeorak.service.NoticeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +21,6 @@ import java.util.List;
 public class NoticeController {
 
     private final NoticeService noticeService;
-    private final UserRepository userRepository;
 
     // ✅ 공지 생성
     @PostMapping
@@ -32,9 +29,7 @@ public class NoticeController {
             @AuthenticationPrincipal(expression = "id") Long userId
     ) {
         log.info("[POST] 공지 생성 요청 by userId={}", userId);
-        User author = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
-        NoticeDto created = noticeService.create(author, request);
+        NoticeDto created = noticeService.create(userId, request);
         return ResponseEntity.ok(NoticeResponse.from(created));
     }
 

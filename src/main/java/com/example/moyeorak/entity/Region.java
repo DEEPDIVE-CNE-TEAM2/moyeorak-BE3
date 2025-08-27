@@ -1,4 +1,4 @@
-// content-service/src/main/java/com/example/content/entity/Region.java
+// content-service/src/main/java/com/example/moyeorak/entity/Region.java
 package com.example.moyeorak.entity;
 
 import jakarta.persistence.*;
@@ -21,20 +21,26 @@ import java.time.OffsetDateTime;
                 @Index(name = "idx_regions_manager_id", columnList = "manager_id")
         }
 )
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Region {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
-    // 필요 시 "시" 허용: "^([가-힣\\s]+시\\s)?[가-힣\\s]+구$"
-    @Pattern(regexp = "^[가-힣\\s]+구$", message = "지역명은 'oo구' 또는 'oo시 oo구' 형식이어야 합니다.")
-    @Column(length = 100, nullable = false)
+    @NotBlank(message = "지역명은 필수입니다.")
+
+    @Pattern(
+            regexp = "^[가-힣\\s]+구$",
+            message = "지역명은 'oo구' 또는 'oo시 oo구' 형식이어야 합니다."
+    )
+    @Column(length = 100, nullable = false, unique = true)
     private String name;
 
-    // ✅ 외부 서비스(User) 참조 없이 값만 저장
     @Column(name = "manager_id")
     private Long managerId;
 

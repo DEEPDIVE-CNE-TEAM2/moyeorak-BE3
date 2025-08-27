@@ -1,8 +1,6 @@
 package com.example.moyeorak.logging;
 
-import com.example.moyeorak.entity.User;
 import com.example.moyeorak.jwt.JwtProvider;
-import com.example.moyeorak.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,65 +24,77 @@ import java.util.UUID;
 public class RequestMdcFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
-    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest req,
                                     HttpServletResponse res,
                                     FilterChain chain) throws ServletException, IOException {
 
-        // 1. traceId: 요청마다 UUID 하나 발급
-        final String traceId = UUID.randomUUID().toString();
+        // 1) traceId: 헤더가 있으면 사용, 없으면 UUID 발급
+        final String traceId = Optional.ofNullable(req.getHeader("X-Trace-Id"))
+                .filter(s -> !s.isBlank())
+                .orElse(UUID.randomUUID().toString());
         MDC.put("traceId", traceId);
 
         try {
-            String token = jwtProvider.resolveToken(req);
-            // 2. 토큰에서 이메일/권한 뽑기
+            // 2) JWT에서 사용자 정보(가능한 경우만) 추출하여 MDC에 기록
+            String token = extractBearer(req);
 
-            // 토큰 유효하지 않으면 요청 차단
-            if (token != null && !jwtProvider.validateToken(token)) {
-                log.warn("만료되었거나 유효하지 않은 토큰입니다. 요청 URI: {}", req.getRequestURI());
-                res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                res.setContentType("application/json");
-                res.getWriter().write("{\"status\":401,\"message\":\"토큰이 만료되었거나 유효하지 않습니다.\"}");
-                return;
-            }
             if (token != null && jwtProvider.validateToken(token)) {
-                String email = jwtProvider.getEmail(token);      // subject = email
-                String roleClaim = jwtProvider.getRole(token);
+                // userId / email / role (ROLE_ 접두사 제거)
+                try {
+                    Long userId = null;
+                    try { userId = jwtProvider.getUserId(token); } catch (Exception ignored) {}
+                    if (userId != null) MDC.put("userId", String.valueOf(userId));
 
-                // 권한 문자열 정규화: ROLE_ 접두사 제거해서 ADMIN/USER로 통일
-                if (roleClaim != null) {
-                    String normalized = roleClaim.startsWith("ROLE_") ? roleClaim.substring(5) : roleClaim;
-                    MDC.put("role", normalized);
-                }
+                    String email = safe(jwtProvider.getEmail(token));
+                    if (email != null) MDC.put("email", email);
 
-                // 3. 이메일로 DB 조회해서 userId / regionId 세팅
-                if (email != null) {
-                    userRepository.findByEmail(email).ifPresent(user -> {
-                        // userId
-                        MDC.put("userId", String.valueOf(user.getId()));
+                    String roleClaim = safe(jwtProvider.getRole(token));
+                    if (roleClaim != null) {
+                        MDC.put("role", normalizeRole(roleClaim));
+                    }
 
-                        // regionId: User가 소속된 지역
-                        if (user.getRegion() != null && user.getRegion().getId() != null) {
-                            MDC.put("regionId", String.valueOf(user.getRegion().getId()));
-                        }
-                    });
+                    // JWT에 regionId 클레임이 있다면 여기도 세팅 (메서드가 없으면 건너뜀)
+                    try {
+                        var regionIdMethod = jwtProvider.getClass().getMethod("getRegionId", String.class);
+                        Object rid = regionIdMethod.invoke(jwtProvider, token);
+                        if (rid != null) MDC.put("regionId", String.valueOf(rid));
+                    } catch (NoSuchMethodException ignored) {
+                        // 프로젝트에 getRegionId가 없다면 무시
+                    }
+                } catch (Exception e) {
+                    // MDC 용도라서 실패해도 요청은 계속
+                    log.debug("MDC 채우는 중 JWT 파싱 예외: {}", e.getMessage());
                 }
             }
 
-            // 4. 헤더로 들어오면 reason/regionId 덮어쓰기 (운영자가 특정 사유 남기고 싶을 때)
-            ofHeader(req, "X-Reason").ifPresent(v -> MDC.put("reason", limit(v, 200)));
+            // 3) 운영자가 헤더로 덮어쓰는 값들 (있을 때만 적용)
+            ofHeader(req, "X-User-Id").ifPresent(v -> MDC.put("userId", v));
+            ofHeader(req, "X-Email").ifPresent(v -> MDC.put("email", v));
+            ofHeader(req, "X-Role").ifPresent(v -> MDC.put("role", normalizeRole(v)));
             ofHeader(req, "X-Region-Id").ifPresent(v -> MDC.put("regionId", v));
+            ofHeader(req, "X-Reason").ifPresent(v -> MDC.put("reason", limit(v, 200)));
 
             chain.doFilter(req, res);
         } finally {
-            // 5. 클리어 해서 스레드 재사용 오염 방지
+            // 4) 스레드 재사용 오염 방지
             MDC.clear();
         }
     }
 
-    // 헤더 값 없거나 공백이면 무시
+    // ───────────── helpers ─────────────
+
+    private static String extractBearer(HttpServletRequest req) {
+        String h = req.getHeader("Authorization");
+        if (h == null) return null;
+        h = h.trim();
+        if (h.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return h.substring(7).trim();
+        }
+        return null;
+    }
+
     private static Optional<String> ofHeader(HttpServletRequest req, String name) {
         String v = req.getHeader(name);
         if (v == null) return Optional.empty();
@@ -92,8 +102,17 @@ public class RequestMdcFilter extends OncePerRequestFilter {
         return v.isEmpty() ? Optional.empty() : Optional.of(v);
     }
 
-    // 긴 문자열 자름
     private static String limit(String s, int max) {
         return (s == null || s.length() <= max) ? s : s.substring(0, max);
+    }
+
+    private static String normalizeRole(String role) {
+        if (role == null) return null;
+        role = role.trim();
+        return role.startsWith("ROLE_") ? role.substring(5) : role;
+    }
+
+    private static String safe(String s) {
+        return (s == null || s.isBlank()) ? null : s;
     }
 }

@@ -3,7 +3,6 @@ package com.example.moyeorak.controller;
 import com.example.moyeorak.dto.MessageResponse;
 import com.example.moyeorak.dto.ProgramDisplayResponse;
 import com.example.moyeorak.dto.ProgramRequest;
-import com.example.moyeorak.security.CustomUserDetails;
 import com.example.moyeorak.service.ProgramService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +23,7 @@ public class ProgramController {
 
     private final ProgramService programService;
 
+    /** 프로그램 생성 (관리자) */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProgramDisplayResponse> createProgram(
@@ -33,31 +33,32 @@ public class ProgramController {
         return ResponseEntity.ok(programService.createProgram(request));
     }
 
+    /** 프로그램 목록 조회 (전체 또는 지역별) */
     @GetMapping
     public ResponseEntity<List<ProgramDisplayResponse>> getPrograms(
             @RequestParam(value = "regionId", required = false) Long regionId,
-            @AuthenticationPrincipal CustomUserDetails user
+            @AuthenticationPrincipal(expression = "id") Long userId
     ) {
-        Long userRegionId = (user != null) ? user.getRegionId() : null;
-        log.info("[GET] 전체 또는 지역별 프로그램 목록 조회 - regionId: {}, userRegionId: {}", regionId, userRegionId);
+        log.info("[GET] 프로그램 목록 조회 - regionId: {}, userId: {}", regionId, userId);
 
         if (regionId != null) {
-            return ResponseEntity.ok(programService.getProgramsByRegion(regionId, userRegionId));
+            return ResponseEntity.ok(programService.getProgramsByRegion(regionId, userId));
         } else {
-            return ResponseEntity.ok(programService.getAllPrograms(userRegionId));
+            return ResponseEntity.ok(programService.getAllPrograms(userId));
         }
     }
 
+    /** 프로그램 상세 조회 */
     @GetMapping("/{id}")
     public ResponseEntity<ProgramDisplayResponse> getProgramById(
             @PathVariable Long id,
-            @AuthenticationPrincipal CustomUserDetails user
+            @AuthenticationPrincipal(expression = "id") Long userId
     ) {
-        Long userRegionId = (user != null) ? user.getRegionId() : null;
-        log.info("[GET] 프로그램 상세 조회 - id: {}, userRegionId: {}", id, userRegionId);
-        return ResponseEntity.ok(programService.getProgramById(id, userRegionId));
+        log.info("[GET] 프로그램 상세 조회 - id: {}, userId: {}", id, userId);
+        return ResponseEntity.ok(programService.getProgramById(id, userId));
     }
 
+    /** 프로그램 부분 수정 (관리자) */
     @PatchMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProgramDisplayResponse> patchProgram(
@@ -68,6 +69,7 @@ public class ProgramController {
         return ResponseEntity.ok(programService.partialUpdateProgram(id, updates));
     }
 
+    /** 프로그램 삭제 (관리자) */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MessageResponse> deleteProgram(@PathVariable Long id) {

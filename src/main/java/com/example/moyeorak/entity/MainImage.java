@@ -1,6 +1,8 @@
 package com.example.moyeorak.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -22,28 +24,34 @@ import java.time.OffsetDateTime;
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class MainImage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(length = 100, nullable = false)
-    private String title;
+    /** 제목은 선택값 */
+    @Builder.Default
+    @Column(length = 100)
+    private String title = "";
 
+    @NotBlank
     @Column(name = "image_url", length = 1024, nullable = false)
     private String imageUrl;
 
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
 
+    @NotNull
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
-    private boolean isActive = true;
+    private Boolean isActive = true;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "region_id", nullable = false, foreignKey = @ForeignKey(name = "fk_main_image_region"))
-    private Region region;
+    /** MAS: Region 엔티티 참조 대신 FK 값만 보관 */
+    @NotNull
+    @Column(name = "region_id", nullable = false)
+    private Long regionId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -55,20 +63,29 @@ public class MainImage {
 
     // ==== 도메인 메소드 ====
 
-    public void update(String title, String imageUrl, int displayOrder, boolean isActive) {
-        this.title = title;
-        this.imageUrl = imageUrl;
-        this.displayOrder = displayOrder;
-        this.isActive = isActive;
+    /** 전체 필드 업데이트 */
+    public void update(String title, String imageUrl, Integer displayOrder, Boolean isActive) {
+        if (title != null) this.title = title;
+        if (imageUrl != null) this.imageUrl = imageUrl;
+        if (displayOrder != null) this.displayOrder = displayOrder;
+        if (isActive != null) this.isActive = isActive;
     }
 
-    // 순서만 바꾸기
+    /** 순서만 변경 */
     public void changeDisplayOrder(Integer displayOrder) {
         this.displayOrder = displayOrder;
     }
 
-    // 활성 상태 토글
-    public void changeActiveStatus(boolean isActive) {
+    /** 활성 상태 변경 */
+    public void changeActiveStatus(Boolean isActive) {
         this.isActive = isActive;
+    }
+
+    // ==== 보정 ====
+    @PrePersist
+    private void prePersistDefaults() {
+        if (this.displayOrder == null) this.displayOrder = 1;
+        if (this.isActive == null) this.isActive = true;
+        if (this.title == null) this.title = "";
     }
 }

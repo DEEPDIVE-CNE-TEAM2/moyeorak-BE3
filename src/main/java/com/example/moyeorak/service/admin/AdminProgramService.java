@@ -8,61 +8,60 @@ import com.example.moyeorak.dto.admin.AdminProgramUpdateRequest;
 import com.example.moyeorak.entity.Facility;
 import com.example.moyeorak.entity.Program;
 import com.example.moyeorak.entity.Region;
-import com.example.moyeorak.entity.User;
 import com.example.moyeorak.exception.BusinessException;
 import com.example.moyeorak.exception.ErrorCode;
-import com.example.moyeorak.jwt.JwtProvider;
-import com.example.moyeorak.repository.*;
-import com.example.moyeorak.security.AdminAuthHelper;
-import jakarta.servlet.http.HttpServletRequest;
+import com.example.moyeorak.repository.FacilityRepository;
+import com.example.moyeorak.repository.ProgramRepository;
+import com.example.moyeorak.repository.RegionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminProgramService {
 
-    private final ProgramRepository programRepository;         // 프로그램 전체 목록
-    private final EnrollmentRepository enrollmentRepository;   // 신청 인원 카운트
+    private final ProgramRepository programRepository;
     private final RegionRepository regionRepository;
     private final FacilityRepository facilityRepository;
-    private final AdminAuthHelper adminAuthHelper;
+    // private final EnrollmentRepository enrollmentRepository; // 분리 서비스 연동 시 사용
 
+    // ───────────────────────── 목록 ─────────────────────────
 
+    /**
+     * 특정 지역의 프로그램 목록(제목 검색 포함)
+     * @param userId   JWT에서 추출한 관리자 사용자 ID
+     * @param regionId 조회할 지역 ID
+     * @param title    부분 검색어 (nullable)
+     */
+    @Transactional(readOnly = true)
+    public List<AdminProgramListResponse> getProgramsByRegionAndTitle(Long userId, Long regionId, String title) {
+        assertRegionManagerByRegionId(userId, regionId);
 
-
-    // 프로그램 리스트 조회
-    public List<AdminProgramListResponse> getProgramsByRegionAndTitle(HttpServletRequest request, Long regionId, String title) {
-        // 관리자 검증
-        Region targetRegion = (regionId == null)
-                ? adminAuthHelper.getAdminRegion(request)
-                : regionRepository.findById(regionId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
-        // 지역 결정
         List<Program> programs = (title == null || title.trim().isEmpty())
-                ? programRepository.findByRegion(targetRegion)
-                : programRepository.findByRegionAndTitleContainingIgnoreCase(targetRegion, title.trim());
+                ? programRepository.findByRegionId(regionId)
+                : programRepository.findByRegionIdAndTitleContainingIgnoreCase(regionId, title.trim());
 
-        return programs.stream()
-                .map(this::toAdminListDto)
-                .toList();
+        return programs.stream().map(this::toAdminListDto).toList();
     }
 
-    // 각 프로그램을 Admin용 DTO로 변환하는 메서드
+    /** Admin 목록용 DTO 변환 (facilityId로 이름 조회) */
     private AdminProgramListResponse toAdminListDto(Program program) {
-        int currentEnrollment = 0; // 일단 0으로 시작. 나중에 enrollmentRepository.countByProgramId()로 바꿀거임
+        int currentEnrollment = 0; // TODO: enrollmentRepository.countByProgramId(program.getId())
+        String facilityName = facilityRepository.findById(program.getFacilityId())
+                .map(Facility::getName)
+                .orElse("(시설 정보 없음)");
 
         return AdminProgramListResponse.builder()
                 .id(program.getId())
                 .title(program.getTitle())
-                .facilityName(program.getFacility().getName())
+                .facilityName(facilityName)
                 .usagePeriod(formatDateRange(program.getUsageStartDate(), program.getUsageEndDate()))
                 .capacity(program.getCapacity())
                 .currentEnrollment(currentEnrollment)
@@ -70,26 +69,32 @@ public class AdminProgramService {
                 .build();
     }
 
+    // ───────────────────────── 생성 ─────────────────────────
 
-    // 프로그램 생성
+    /**
+     * 프로그램 생성
+     * @param request 생성 요청(지역/시설/기타 정보)
+     * @param userId  관리자 사용자 ID
+     * @return 생성된 프로그램 ID
+     */
     @Transactional
-    public Long createProgram(AdminProgramCreateRequest request, HttpServletRequest httpRequest) {
-        // 지역과 시설 조회 + 일치 여부 검증
+    public Long createProgram(AdminProgramCreateRequest request, Long userId) {
         Region region = regionRepository.findById(request.getRegionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+        assertRegionManager(userId, region);
 
         Facility facility = facilityRepository.findById(request.getFacilityId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
 
-        if (!facility.getRegion().getId().equals(region.getId())) {
+        // 시설이 같은 지역에 속하는지 FK로 검증
+        if (!facility.getRegionId().equals(region.getId())) {
             throw new BusinessException(ErrorCode.FACILITY_REGION_MISMATCH);
         }
 
-        // 프로그램 엔티티 생성
         Program program = Program.builder()
                 .title(request.getTitle())
-                .region(region)
-                .facility(facility)
+                .regionId(region.getId())          // ✅ MAS: 엔티티 대신 FK 저장
+                .facilityId(facility.getId())      // ✅ MAS: 엔티티 대신 FK 저장
                 .category(request.getCategory())
                 .target(request.getTarget())
                 .instructorName(request.getInstructorName())
@@ -109,49 +114,53 @@ public class AdminProgramService {
                 .description(request.getDescription())
                 .build();
 
-        // 4. 저장 후 ID 반환
         Program saved = programRepository.save(program);
         return saved.getId();
     }
 
-    // 프로그램 상세 조회
-    public AdminProgramDetailResponse getProgramDetail(Long programId) {
+    // ───────────────────────── 상세 ─────────────────────────
+
+    @Transactional(readOnly = true)
+    public AdminProgramDetailResponse getProgramDetail(Long userId, Long programId) {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PROGRAM));
+
+        // 지역 권한 체크 (program.regionId 기준)
+        assertRegionManagerByRegionId(userId, program.getRegionId());
+
+        // 응답에 지역/시설 이름이 필요하므로 각각 조회
+        Region region = regionRepository.findById(program.getRegionId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+        Facility facility = facilityRepository.findById(program.getFacilityId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
 
         return AdminProgramDetailResponse.builder()
                 .id(program.getId())
                 .title(program.getTitle())
 
-                // region, facility
-                .regionId(program.getRegion().getId())
-                .regionName(program.getRegion().getName())
-                .facilityId(program.getFacility().getId())
-                .facilityName(program.getFacility().getName())
+                .regionId(region.getId())
+                .regionName(region.getName())
+                .facilityId(facility.getId())
+                .facilityName(facility.getName())
 
-                // 기본 필드
                 .category(program.getCategory())
                 .target(program.getTarget())
                 .instructorName(program.getInstructorName())
                 .status(program.getStatus().name())
 
-                // 날짜 원본
                 .usageStartDate(program.getUsageStartDate())
                 .usageEndDate(program.getUsageEndDate())
                 .registrationStartDate(program.getRegistrationStartDate())
                 .registrationEndDate(program.getRegistrationEndDate())
                 .cancelEndDate(program.getCancelEndDate())
 
-                // 시간 원본
                 .classStartTime(program.getClassStartTime())
                 .classEndTime(program.getClassEndTime())
 
-                // 상세정보 보기용 포맷
                 .usagePeriod(formatDateRange(program.getUsageStartDate(), program.getUsageEndDate()))
                 .classTime(formatTimeRange(program.getClassStartTime(), program.getClassEndTime()))
                 .registrationPeriod(formatDateRange(program.getRegistrationStartDate(), program.getRegistrationEndDate()))
 
-                // 가격/기타
                 .inPrice(program.getInPrice())
                 .outPrice(program.getOutPrice())
                 .capacity(program.getCapacity())
@@ -161,16 +170,15 @@ public class AdminProgramService {
                 .build();
     }
 
+    // ───────────────────────── 수정 ─────────────────────────
 
-    // 프로그램 수정
     @Transactional
-    public Long patchProgram(Long programId, AdminProgramUpdateRequest request, HttpServletRequest httpRequest) {
-        User admin = adminAuthHelper.getAdminFromRequest(httpRequest);
-
+    public Long patchProgram(Long programId, AdminProgramUpdateRequest request, Long userId) {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PROGRAM));
 
-        // 값 있는 것만 덮어쓰기
+        assertRegionManagerByRegionId(userId, program.getRegionId());
+
         if (request.getTitle() != null) program.setTitle(request.getTitle());
         if (request.getCategory() != null) program.setCategory(request.getCategory());
         if (request.getTarget() != null) program.setTarget(request.getTarget());
@@ -195,46 +203,58 @@ public class AdminProgramService {
             Facility facility = facilityRepository.findById(request.getFacilityId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FACILITY));
 
-            if (!facility.getRegion().getId().equals(program.getRegion().getId())) {
+            // 기존 프로그램의 지역 FK와 새 시설의 지역 FK 비교
+            if (!facility.getRegionId().equals(program.getRegionId())) {
                 throw new BusinessException(ErrorCode.FACILITY_REGION_MISMATCH);
             }
-
-            program.setFacility(facility);
+            program.setFacilityId(facility.getId()); // ✅ MAS: FK 업데이트
         }
 
         return program.getId();
     }
 
-    // 프로그램 삭제
-    @Transactional
-    public MessageResponse deleteProgram(Long programId, HttpServletRequest request) {
-        User admin = adminAuthHelper.getAdminFromRequest(request);
+    // ───────────────────────── 삭제 ─────────────────────────
 
+    @Transactional
+    public MessageResponse deleteProgram(Long programId, Long userId) {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PROGRAM));
 
-        programRepository.delete(program);
+        assertRegionManagerByRegionId(userId, program.getRegionId());
 
+        programRepository.delete(program);
         return new MessageResponse("프로그램이 삭제되었습니다.");
     }
 
-    // 시간 포매팅
+    // ───────────────────────── helpers ─────────────────────────
+
+    private void assertRegionManagerByRegionId(Long userId, Long regionId) {
+        Region region = regionRepository.findById(regionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGION));
+        assertRegionManager(userId, region);
+    }
+
+    private void assertRegionManager(Long userId, Region region) {
+        Long managerId = region.getManagerId();
+        if (managerId == null || !managerId.equals(userId)) {
+            // TODO: ErrorCode에 UNAUTHORIZED_PROGRAM_ACCESS 추가 후 교체
+            throw new BusinessException(ErrorCode.UNAUTHORIZED_FACILITY_ACCESS);
+        }
+    }
+
     private String formatTimeRange(LocalTime start, LocalTime end) {
         return start + " ~ " + end;
     }
 
-    // 날짜 "YYYY-MM-DD ~ YYYY-MM-DD" 포맷팅
     private String formatDateRange(LocalDate start, LocalDate end) {
         return start + " ~ " + end;
     }
 
-    // 오늘 날짜 기준으로 수업 상태 판단: 수업 예정 / 진행중 / 수업 종료
+    /** 오늘 기준으로 수업 상태 판단: 수업 예정 / 진행중 / 수업 종료 */
     private String getProgressStatus(LocalDate start, LocalDate end) {
         LocalDate today = LocalDate.now();
         if (today.isBefore(start)) return "수업 예정";
         else if (!today.isAfter(end)) return "진행중";
         else return "수업 종료";
     }
-
-
 }

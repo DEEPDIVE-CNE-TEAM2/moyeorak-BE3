@@ -12,7 +12,7 @@ public record MainImageResponse(
         String imageUrl,
         Integer displayOrder,
         Boolean isActive,
-        String regionName,
+        Long regionId,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -22,10 +22,10 @@ public record MainImageResponse(
                 .title(image.getTitle())
                 .imageUrl(image.getImageUrl())
                 .displayOrder(image.getDisplayOrder())
-                .isActive(image.isActive())
-                .regionName(image.getRegion().getName())
-                .createdAt(image.getCreatedAt())
-                .updatedAt(image.getUpdatedAt())
+                .isActive(image.getIsActive()) // Boolean 게터 사용
+                .regionId(image.getRegionId()) // 엔티티 참조 대신 FK
+                .createdAt(image.getCreatedAt() != null ? image.getCreatedAt().toLocalDateTime() : null)
+                .updatedAt(image.getUpdatedAt() != null ? image.getUpdatedAt().toLocalDateTime() : null)
                 .build();
     }
 }

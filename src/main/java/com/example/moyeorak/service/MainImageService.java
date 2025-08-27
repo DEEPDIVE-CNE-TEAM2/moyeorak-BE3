@@ -37,7 +37,7 @@ public class MainImageService {
                 .title(request.title())
                 .imageUrl(request.imageUrl())
                 .displayOrder(request.displayOrder())
-                .isActive(request.isActive() != null && request.isActive())
+                .isActive(request.isActive() != null && request.isActive()) // Boolean → boolean 처리
                 .regionId(regionId) // ✅ Region 엔티티 대신 ID 값만 저장
                 .build();
 
@@ -67,7 +67,7 @@ public class MainImageService {
                 request.title() != null ? request.title() : image.getTitle(),
                 request.imageUrl() != null ? request.imageUrl() : image.getImageUrl(),
                 request.displayOrder() != null ? request.displayOrder() : image.getDisplayOrder(),
-                request.isActive() != null ? request.isActive() : image.isActive()
+                request.isActive() != null ? request.isActive() : image.getIsActive() // ← 여기 수정
         );
 
         return MainImageResponse.from(image);

@@ -19,7 +19,9 @@ public interface ProgramRepository extends JpaRepository<Program, Long> {
             LocalTime classEndTime
     );
 
+    // ✅ MAS: Program.regionId(FK) 기준 조회
     List<Program> findByRegionId(Long regionId);
 
+    // ✅ MAS: Program.regionId + 제목 부분검색
     List<Program> findByRegionIdAndTitleContainingIgnoreCase(Long regionId, String title);
 }
