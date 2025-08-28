@@ -17,8 +17,6 @@ configurations {
     compileOnly { extendsFrom annotationProcessor }
 }
 
-// ✅ repositories 블록 제거
-
 dependencies {
     // --- Spring Boot ---
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -29,8 +27,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    // DB 마이그레이션
+    // --- DB 마이그레이션 (MySQL 8 대응) ---
     implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
 
     // OpenAPI (Swagger UI)
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
@@ -44,7 +43,7 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    // DTO 매핑(선택)
+    // DTO 매핑
     implementation 'org.mapstruct:mapstruct:1.5.5.Final'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
 
@@ -67,14 +66,16 @@ dependencies {
         exclude group: 'software.amazon.awssdk'
     }
 
-    // --- AWS SDK v2 : BOM 고정 ---
+    // --- AWS SDK v2 : BOM ---
     implementation platform('software.amazon.awssdk:bom:2.25.62')
     implementation 'software.amazon.awssdk:sqs'
     implementation 'software.amazon.awssdk:cloudwatch'
     implementation 'software.amazon.awssdk:cloudwatchlogs'
 }
 
-tasks.named('test') { useJUnitPlatform() }
+tasks.named('test') {
+    useJUnitPlatform()
+}
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'

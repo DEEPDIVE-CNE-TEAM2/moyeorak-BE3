@@ -1,30 +1,38 @@
-server:
-  port: 8080
-
 spring:
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/moyeorak?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:password}   # ? ?? ????? ???
     driver-class-name: com.mysql.cj.jdbc.Driver
-
+    url: jdbc:mysql://localhost:3306/moyeorak_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true&useSSL=false&createDatabaseIfNotExist=true
+    username: choi
+    password: 1q2w3e4r!!
   jpa:
-    hibernate:
-      ddl-auto: validate                # Flyway ?? ? validate/none ??
     open-in-view: false
+    hibernate:
+      ddl-auto: none         # Flyway 사용, 스키마는 마이그레이션으로만
     properties:
       hibernate:
         format_sql: true
-        jdbc.time_zone: Asia/Seoul
-
+        # dialect 명시는 불필요 경고가 떠서 생략 가능 (자동 감지됨)
   flyway:
     enabled: true
-    locations: classpath:db/migration   # V1__*.sql ? ??
-    baseline-on-migrate: true           # ?? ???? ??? ?????
-    url: ${spring.datasource.url}
-    user: ${spring.datasource.username}
-    password: ${spring.datasource.password}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    schemas: moyeorak_db
+    validate-on-migrate: false
 
-# (??) JWT ??? ????? ???
-jwt:
-  secret: ${JWT_SECRET:change-me-in-local}
+  # 로컬에선 SQS/Redis 같은 외부 인프라 자동 구성 막아두기
+  autoconfigure:
+    exclude:
+      - io.awspring.cloud.autoconfigure.sqs.SqsAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+  cache:
+    type: simple  # 캐시는 메모리(Simple)로
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+
+# ★ placeholder 에러 해결: 로컬용 기본값(임시)
+cloudfront:
+  base-url: http://localhost:8080
