@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,6 +34,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
 
+    /** 로컬/개발에서만 임시 우회 허용 (기본 false) */
+    @Value("${security.jwt.dev-bypass:false}")
+    private boolean devBypass;
+
     /** 스웨거/헬스/정적 리소스 등은 필터를 건너뜀 */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -52,12 +57,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
-        if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7);
+        try {
+            if (header != null && header.startsWith("Bearer ")) {
+                // 정상적인 Bearer 토큰 경로
+                String token = header.substring(7);
 
-            try {
                 if (jwtProvider.validateToken(token)) {
-
                     Long userId = jwtProvider.getUserId(token);   // id/userId/uid/sub(숫자)에서 추출
                     String email = jwtProvider.getEmail(token);
                     String role  = jwtProvider.getRole(token);
@@ -78,26 +83,67 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         SecurityContextHolder.getContext().setAuthentication(auth);
                         log.debug("✅ JWT 인증 성공 - userId: {}, email: {}, role: {}", userId, email, authority);
                     }
+                } else {
+                    // Bearer 였지만 검증 실패
+                    if (devBypass) {
+                        bypassAsTempUser(request, "검증실패(개발우회)");
+                    } else {
+                        // 예외 처리: 검증 실패를 401로 응답
+                        response.setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않은 JWT 토큰입니다.");
+                        return;
+                    }
                 }
-            } catch (ExpiredJwtException e) {
+
+            } else {
+                // Bearer 형식이 아니거나 헤더 없음
+                if (devBypass) {
+                    bypassAsTempUser(request, "헤더없음/비Bearer(개발우회)");
+                }
+            }
+
+            filterChain.doFilter(request, response);
+
+        } catch (ExpiredJwtException e) {
+            if (devBypass) {
+                bypassAsTempUser(request, "만료(개발우회)");
+                filterChain.doFilter(request, response);
+            } else {
                 log.warn("❌ AccessToken 만료: {}", e.getMessage());
                 response.setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\", error_description=\"expired\"");
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "AccessToken이 만료되었습니다.");
-                return;
-            } catch (SignatureException | MalformedJwtException e) {
+            }
+        } catch (SignatureException | MalformedJwtException e) {
+            if (devBypass) {
+                bypassAsTempUser(request, "서명/형식 오류(개발우회)");
+                filterChain.doFilter(request, response);
+            } else {
                 log.warn("❌ 잘못된 JWT 서명 또는 토큰 형식: {}", e.getMessage());
                 response.setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않은 JWT 토큰입니다.");
-                return;
-            } catch (Exception e) {
+            }
+        } catch (Exception e) {
+            if (devBypass) {
+                bypassAsTempUser(request, "기타오류(개발우회)");
+                filterChain.doFilter(request, response);
+            } else {
                 log.warn("❌ JWT 검증 중 기타 오류: {}", e.getMessage());
                 response.setHeader("WWW-Authenticate", "Bearer");
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT 인증에 실패했습니다.");
-                return;
             }
         }
-        // Authorization 헤더가 없거나 Bearer가 아니면 그대로 다음 필터로 진행
-        filterChain.doFilter(request, response);
+    }
+
+    private void bypassAsTempUser(HttpServletRequest request, String reason) {
+        // 필요시 권한을 고정값으로 부여 (예: ROLE_USER). 민감 API는 Controller/Method 보안으로 추가 제어 권장
+        var authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        var principal = new SimpleUserPrincipal(-1L, "temp@local");
+
+        var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        log.warn("⚠️ JWT 우회 인증 적용 [{}] - tempUser로 진행", reason);
     }
 
     /** 컨트롤러에서 @AuthenticationPrincipal(expression = "id") / ("email") 로 접근 가능한 Principal */
