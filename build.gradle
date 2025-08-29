@@ -48,7 +48,7 @@ dependencies {
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
     // DB Driver
-    runtimeOnly 'com.mysql:mysql-connector-j'  // 9.x 사용 중 (OK)
+    runtimeOnly 'com.mysql:mysql-connector-j'  // 9.x OK
 
     // --- Test ---
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
@@ -56,10 +56,10 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     // --- AWS Spring Cloud (SQS) ---
-    // spring-cloud-aws BOM (starter 버전 정합성만 관리; SDK 버전은 아래에서 별도 BOM으로 고정)
+    // spring-cloud-aws BOM
     implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.0.2')
 
-    // starter가 끌고오는 software.amazon.awssdk(구버전)를 제외하고, 아래에서 우리가 지정한 BOM 버전을 사용
+    // starter가 끌고오는 SDK 버전 고정 방지
     implementation('io.awspring.cloud:spring-cloud-aws-starter-sqs') {
         exclude group: 'software.amazon.awssdk'
     }
@@ -72,7 +72,12 @@ dependencies {
     implementation 'software.amazon.awssdk:cloudwatch'
     implementation 'software.amazon.awssdk:cloudwatchlogs'
 
-    // 필요 시 추가 예: implementation 'software.amazon.awssdk:sts' 등
+    // ✅ 추가: S3 (Presigner/PutObjectRequest 포함)
+    implementation 'software.amazon.awssdk:s3'
+
+    // (선택) 대용량/비동기 업로드 필요 시
+    // implementation 'software.amazon.awssdk:s3-transfer-manager'
+    // implementation 'software.amazon.awssdk:sts' // 필요한 경우만
 }
 
 tasks.named('test') {
