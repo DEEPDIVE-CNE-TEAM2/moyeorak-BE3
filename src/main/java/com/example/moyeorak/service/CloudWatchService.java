@@ -94,7 +94,7 @@ public class CloudWatchService {
                 .logGroupNames(req.getLogGroupNames())
                 .startTime(req.getStartTime().getEpochSecond())
                 .endTime(req.getEndTime().getEpochSecond())
-                .queryString(req.getQueryString())
+                .queryString(req.getQueryString().trim())
                 .limit(1000)
                 .build();
 
