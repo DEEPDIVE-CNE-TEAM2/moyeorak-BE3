@@ -18,4 +18,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(code.getStatus())
                 .body(ErrorResponse.of(code));
     }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
+        log.error("Unexpected error", ex);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "RUNTIME_ERROR", ex.getMessage()));
+    }
 }
