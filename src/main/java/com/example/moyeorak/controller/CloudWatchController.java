@@ -29,10 +29,6 @@ public class CloudWatchController {
 
     @PostMapping("/logs/query")
     public CompletableFuture<List<Map<String, Object>>> queryLogs(@RequestBody @Valid LogsQueryRequest req) {
-        return service.runLogsInsightsAsync(req)
-                .exceptionally(ex -> {
-                    // 예외 발생 시 처리 (ex.getMessage() 로 클라이언트에 알려주거나 로깅 가능)
-                    throw new RuntimeException("Failed to query logs: " + ex.getMessage(), ex);
-                });
+        return service.runLogsInsightsAsync(req);
     }
 }
