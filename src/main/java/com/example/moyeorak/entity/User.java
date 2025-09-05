@@ -60,6 +60,7 @@ public class User {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
+    @Column(name = "refresh_token", length = 2048)
     private String refreshToken;
 
     @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
