@@ -7,8 +7,10 @@ import com.example.moyeorak.service.admin.AdminMainImageService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +25,7 @@ public class AdminMainImageController {
     private final AdminMainImageService adminMainImageService;
 
     @Operation(summary = "홍보물 생성")
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AdminMainImageResponse> createMainImage(
             @Valid @RequestBody AdminMainImageCreateRequest request,
             HttpServletRequest httpRequest
@@ -46,31 +48,82 @@ public class AdminMainImageController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMainImage(@PathVariable Long id, HttpServletRequest httpRequest) {
         log.info("홍보물 삭제 요청: id={}", id);
-        adminMainImageService.deleteById(id, httpRequest); // ✅ HttpServletRequest 전달
+        adminMainImageService.deleteById(id, httpRequest);
         log.info("홍보물 삭제 완료: id={}", id);
-        return ResponseEntity.noContent().build(); // 204
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "홍보물 순서 및 표시여부 전체 수정")
-    @PatchMapping
+    @PatchMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Void> updateMainImages(
             @RequestBody List<AdminMainImageUpdateRequest> requestList,
             HttpServletRequest httpRequest
     ) {
         log.info("홍보물 순서/표시여부 전체 수정 요청: {}건", requestList.size());
-        adminMainImageService.updateMainImages(requestList, httpRequest); // ✅ HttpServletRequest 전달
+        adminMainImageService.updateMainImages(requestList, httpRequest);
         log.info("홍보물 순서/표시여부 전체 수정 완료");
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "S3 업로드용 Presigned URL 발급")
+    // -------------------------------
+    // Presigned URL 발급 (권장) : POST + JSON Body
+    // -------------------------------
+    @Operation(summary = "S3 업로드용 Presigned URL 발급 (권장: POST + JSON Body)")
+    @PostMapping(value = "/presigned-url", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> createPresignedUrl(
+            @Valid @RequestBody PresignUrlRequest body,
+            HttpServletRequest httpRequest
+    ) {
+        String filename = body.filename();
+        String contentType = body.contentType();
+
+        if (isBlank(filename) || isBlank(contentType)) {
+            return ResponseEntity.badRequest().body("filename과 contentType는 비어 있을 수 없습니다.");
+        }
+
+        String url = adminMainImageService.createPresignedPutUrl(filename, contentType, httpRequest);
+        return ResponseEntity.ok(url);
+    }
+
+    // -------------------------------
+    // Presigned URL 발급 (호환) : GET + query
+    // - 기존 클라이언트가 보내는 filetype도 지원
+    // - contentType이 있으면 contentType 우선
+    // -------------------------------
+    @Operation(summary = "S3 업로드용 Presigned URL 발급 (호환: GET + query, contentType/filetype 지원)")
     @GetMapping("/presigned-url")
     public ResponseEntity<String> getPresignedUrl(
             @RequestParam String filename,
-            @RequestParam String filetype,
+            @RequestParam(name = "contentType", required = false) String contentType,
+            @RequestParam(name = "filetype", required = false) String filetype,
             HttpServletRequest httpRequest
     ) {
-        String url = adminMainImageService.createPresignedPutUrl(filename, filetype, httpRequest);
+        String ct = !isBlank(contentType) ? contentType : filetype;
+
+        if (isBlank(filename)) {
+            return ResponseEntity.badRequest().body("필수 파라미터 누락: filename");
+        }
+        if (isBlank(ct)) {
+            return ResponseEntity.badRequest().body("필수 파라미터 누락: contentType (alias: filetype)");
+        }
+
+        String url = adminMainImageService.createPresignedPutUrl(filename, ct, httpRequest);
         return ResponseEntity.ok(url);
     }
+
+    // ------------------------------------
+    // 내부 유틸
+    // ------------------------------------
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    /**
+     * POST /presigned-url 요청용 DTO
+     * contentType에는 MIME 전체값을 넣어야 합니다. 예: image/jpeg, image/png, image/webp
+     */
+    public record PresignUrlRequest(
+            @NotBlank String filename,
+            @NotBlank String contentType
+    ) {}
 }

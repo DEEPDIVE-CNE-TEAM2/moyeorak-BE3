@@ -20,6 +20,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -35,15 +36,20 @@ public class AdminMainImageService {
     @Value("${app.s3.bucket:}")
     private String bucketName;
 
+    /** 허용할 이미지 Content-Type 화이트리스트 */
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+    );
+
     /* ========================= Read ========================= */
     @Transactional(readOnly = true)
     public List<AdminMainImageResponse> getMainImages(HttpServletRequest request) {
         User admin = adminAuthHelper.getAdminFromRequest(request);
-        if (admin.getRegion() == null || admin.getRegion().getId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No permission for this region.");
-        }
-        Long regionId = admin.getRegion().getId();
+        ensureRegionAccess(admin);
 
+        Long regionId = admin.getRegion().getId();
         return mainImageRepository.findByRegionIdOrderByDisplayOrderAsc(regionId)
                 .stream()
                 .map(AdminMainImageResponse::from)
@@ -54,21 +60,19 @@ public class AdminMainImageService {
     @Transactional
     public AdminMainImageResponse createMainImage(AdminMainImageCreateRequest dto, HttpServletRequest request) {
         User admin = adminAuthHelper.getAdminFromRequest(request);
-        if (admin.getRegion() == null || admin.getRegion().getId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No permission for this region.");
-        }
-        Long regionId = admin.getRegion().getId();
+        ensureRegionAccess(admin);
 
-        if (dto.getImageUrl() == null || dto.getImageUrl().isBlank()) {
+        if (isBlank(dto.getImageUrl())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "imageUrl is required.");
         }
 
+        Long regionId = admin.getRegion().getId();
         Integer maxOrder = mainImageRepository.findMaxDisplayOrderByRegionId(regionId);
         int nextOrder = (maxOrder != null) ? maxOrder + 1 : 1;
 
         MainImage image = MainImage.builder()
                 .imageUrl(dto.getImageUrl())
-                .title("")                 // use dto.getTitle() if needed
+                .title("")                 // 필요 시 dto.getTitle() 사용
                 .displayOrder(nextOrder)
                 .isActive(true)
                 .region(admin.getRegion())
@@ -81,9 +85,8 @@ public class AdminMainImageService {
     @Transactional
     public void updateMainImages(List<AdminMainImageUpdateRequest> requestList, HttpServletRequest request) {
         User admin = adminAuthHelper.getAdminFromRequest(request);
-        if (admin.getRegion() == null || admin.getRegion().getId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No permission for this region.");
-        }
+        ensureRegionAccess(admin);
+
         Long regionId = admin.getRegion().getId();
 
         for (AdminMainImageUpdateRequest req : requestList) {
@@ -95,7 +98,7 @@ public class AdminMainImageService {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No permission for this region resource.");
             }
 
-            // If you want to enable order change, open the entity method.
+            // 정렬 변경이 필요하면 주석 해제
             // if (req.getDisplayOrder() != null) {
             //     image.changeDisplayOrder(req.getDisplayOrder());
             // }
@@ -110,9 +113,8 @@ public class AdminMainImageService {
     @Transactional
     public void deleteById(Long id, HttpServletRequest request) {
         User admin = adminAuthHelper.getAdminFromRequest(request);
-        if (admin.getRegion() == null || admin.getRegion().getId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No permission for this region.");
-        }
+        ensureRegionAccess(admin);
+
         Long regionId = admin.getRegion().getId();
 
         MainImage image = mainImageRepository.findById(id)
@@ -125,30 +127,32 @@ public class AdminMainImageService {
         mainImageRepository.delete(image);
     }
 
-    /* ============== S3 Presigned PUT URL ============== */
+    /* ============== S3 Presigned PUT URL (권장 시그니처: contentType) ============== */
     @Transactional(readOnly = true)
-    public String createPresignedPutUrl(String filename, String filetype, HttpServletRequest request) {
+    public String createPresignedPutUrl(String filename, String contentType, HttpServletRequest request) {
         User admin = adminAuthHelper.getAdminFromRequest(request);
-        if (admin.getRegion() == null || admin.getRegion().getId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No permission for this region.");
-        }
+        ensureRegionAccess(admin);
 
-        if (bucketName == null || bucketName.isBlank()) {
+        if (isBlank(bucketName)) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "S3 bucket is not configured.");
         }
-        if (filename == null || filename.isBlank()) {
+        if (isBlank(filename)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "filename is required.");
         }
-        if (filetype == null || filetype.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "filetype is required.");
+        if (isBlank(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "contentType is required.");
+        }
+        if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported contentType: " + contentType);
         }
 
-        String key = "main-images/" + admin.getRegion().getId() + "/" + filename;
+        String safeFilename = sanitizeFilename(filename);
+        String key = "main-images/" + admin.getRegion().getId() + "/" + safeFilename;
 
         PutObjectRequest putObject = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
-                .contentType(filetype)
+                .contentType(contentType)
                 .build();
 
         PutObjectPresignRequest presignReq = PutObjectPresignRequest.builder()
@@ -158,5 +162,26 @@ public class AdminMainImageService {
 
         // Use injected presigner (no per-call create/close).
         return s3Presigner.presignPutObject(presignReq).url().toString();
+    }
+
+    /* ========================= 내부 유틸 ========================= */
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    private static void ensureRegionAccess(User admin) {
+        if (admin.getRegion() == null || admin.getRegion().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No permission for this region.");
+        }
+    }
+
+    /** 경로 분리자/상대경로 차단 등 간단 위생 처리 */
+    private static String sanitizeFilename(String filename) {
+        String f = filename.trim();
+        if (f.contains("/") || f.contains("\\") || f.contains("..")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename.");
+        }
+        return f;
     }
 }
