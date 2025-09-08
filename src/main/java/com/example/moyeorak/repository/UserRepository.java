@@ -3,18 +3,29 @@ package com.example.moyeorak.repository;
 import com.example.moyeorak.entity.Region;
 import com.example.moyeorak.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
+
+    /* ===== 안전 로딩(Region 미리 로딩) 전용 메서드 ===== */
+
+    @EntityGraph(attributePaths = "region")
+    Optional<User> findByEmailWithRegion(String email);
+
+    @EntityGraph(attributePaths = "region")
+    Optional<User> findByPhoneWithRegion(String phone);
+
+    @EntityGraph(attributePaths = "region")
+    List<User> findAllByOrderByIdDesc();
+
+    /* ===== 기존 메서드 (그대로 두되, 로그인/조회 로직에서는 위 메서드 사용 권장) ===== */
+
     Optional<User> findByEmail(String email);
     Optional<User> findByPhone(String phone);
     List<User> findByRegion(Region region);
-
-    // 회원조회할때 user만 보이게
     List<User> findByRegionAndRole(Region region, User.Role role);
-
-    // region, role, 이름(검색어) 포함(대소문자 무시) 조건으로 유저 필터링
     List<User> findByRegionAndRoleAndNameContainingIgnoreCase(Region region, User.Role role, String name);
 }
