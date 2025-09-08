@@ -13,15 +13,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /* ===== 안전 로딩(Region 미리 로딩) 전용 메서드 ===== */
 
     @EntityGraph(attributePaths = "region")
-    Optional<User> findByEmailWithRegion(String email);
+    Optional<User> findWithRegionByEmail(String email);
 
     @EntityGraph(attributePaths = "region")
-    Optional<User> findByPhoneWithRegion(String phone);
+    Optional<User> findWithRegionByPhone(String phone);
 
     @EntityGraph(attributePaths = "region")
     List<User> findAllByOrderByIdDesc();
 
-    /* ===== 기존 메서드 (그대로 두되, 로그인/조회 로직에서는 위 메서드 사용 권장) ===== */
+    /* ===== 기존 메서드 (필요시 사용 가능) ===== */
 
     Optional<User> findByEmail(String email);
     Optional<User> findByPhone(String phone);

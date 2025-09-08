@@ -9,8 +9,6 @@ import com.example.moyeorak.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Sort;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,7 +21,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
     /* ===========================
@@ -79,16 +77,14 @@ public class UserService {
        =========================== */
     @Transactional
     public LoginResponseDto login(UserLoginRequestDto dto) {
-        User user = userRepository.findByEmailWithRegion(dto.getEmail())
+        User user = userRepository.findWithRegionByEmail(dto.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이메일입니다."));
 
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
-        // 트랜잭션 안에서 필요한 값 접근 (이미 region이 로딩됨)
         String role = user.getRole().name();
-
         String accessToken = jwtProvider.generateToken(user.getEmail(), role);
         String refreshToken = jwtProvider.generateRefreshToken(user.getEmail());
 
@@ -103,18 +99,17 @@ public class UserService {
        =========================== */
     @Transactional
     public void updateRefreshToken(String email, String refreshToken) {
-        User user = getUserByEmail(email); // WithRegion 사용함
+        User user = getUserByEmail(email); // WithRegion 사용
         user.setRefreshToken(refreshToken);
         userRepository.save(user);
     }
 
     /* ===========================
-       내 정보 조회
-       - DTO 변환을 트랜잭션 안에서 끝내기
+       내 정보 조회 (DTO 변환을 트랜잭션 안에서 끝내기)
        =========================== */
     @Transactional(Transactional.TxType.SUPPORTS)
     public UserResponseDto getMyInfo(String email) {
-        User user = getUserByEmail(email); // 이미 WithRegion
+        User user = getUserByEmail(email);
         return UserResponseDto.fromEntity(user);
     }
 
@@ -223,7 +218,7 @@ public class UserService {
        - WithRegion 사용으로 이후 접근 안전
        =========================== */
     public User getUserByEmail(String email) {
-        return userRepository.findByEmailWithRegion(email)
+        return userRepository.findWithRegionByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
     }
 
