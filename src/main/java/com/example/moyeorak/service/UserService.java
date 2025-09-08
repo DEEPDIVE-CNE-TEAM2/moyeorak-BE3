@@ -6,10 +6,11 @@ import com.example.moyeorak.entity.User;
 import com.example.moyeorak.jwt.JwtProvider;
 import com.example.moyeorak.repository.RegionRepository;
 import com.example.moyeorak.repository.UserRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -21,12 +22,13 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
-    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
     /* ===========================
        회원가입
        =========================== */
+    @Transactional
     public UserSignupResponseDto signup(UserSignupRequestDto dto) {
         String email = dto.getEmail().trim().toLowerCase();
         String phone = dto.getPhone().trim();
@@ -73,7 +75,6 @@ public class UserService {
 
     /* ===========================
        로그인 (refreshToken 저장 포함)
-       - Region 안전 로딩 & 트랜잭션 내부 처리
        =========================== */
     @Transactional
     public LoginResponseDto login(UserLoginRequestDto dto) {
@@ -99,15 +100,15 @@ public class UserService {
        =========================== */
     @Transactional
     public void updateRefreshToken(String email, String refreshToken) {
-        User user = getUserByEmail(email); // WithRegion 사용
+        User user = getUserByEmail(email);
         user.setRefreshToken(refreshToken);
         userRepository.save(user);
     }
 
     /* ===========================
-       내 정보 조회 (DTO 변환을 트랜잭션 안에서 끝내기)
+       내 정보 조회
        =========================== */
-    @Transactional(Transactional.TxType.SUPPORTS)
+    @Transactional(readOnly = true)
     public UserResponseDto getMyInfo(String email) {
         User user = getUserByEmail(email);
         return UserResponseDto.fromEntity(user);
@@ -120,7 +121,7 @@ public class UserService {
     public UserResponseDto updateUserInfo(String email, UserUpdateRequestDto dto) {
         log.info("[UserService] 사용자 정보 수정 요청: {}", email);
 
-        User user = getUserByEmail(email); // WithRegion → region 접근 안전
+        User user = getUserByEmail(email);
 
         updateIfChanged(dto.getEmail(), user.getEmail(), newEmail -> {
             validateDuplicateEmail(newEmail);
@@ -185,9 +186,8 @@ public class UserService {
 
     /* ===========================
        전체 사용자 조회 (관리자)
-       - Region 페치 + 트랜잭션 안에서 DTO 변환
        =========================== */
-    @Transactional(Transactional.TxType.SUPPORTS)
+    @Transactional(readOnly = true)
     public List<UserResponseDto> getAllUsers() {
         return userRepository.findAllByOrderByIdDesc().stream()
                 .map(UserResponseDto::fromEntity)
@@ -197,6 +197,7 @@ public class UserService {
     /* ===========================
        비밀번호 검증
        =========================== */
+    @Transactional(readOnly = true)
     public boolean verifyPassword(String email, String password) {
         User user = getUserByEmail(email);
         return passwordEncoder.matches(password, user.getPassword());
@@ -205,18 +206,20 @@ public class UserService {
     /* ===========================
        중복 체크
        =========================== */
+    @Transactional(readOnly = true)
     public boolean isEmailDuplicate(String email) {
         return userRepository.findByEmail(email.trim().toLowerCase()).isPresent();
     }
 
+    @Transactional(readOnly = true)
     public boolean isPhoneDuplicate(String phone) {
         return userRepository.findByPhone(phone.trim()).isPresent();
     }
 
     /* ===========================
-       사용자 단건 조회 (공용 헬퍼)
-       - WithRegion 사용으로 이후 접근 안전
+       사용자 단건 조회
        =========================== */
+    @Transactional(readOnly = true)
     public User getUserByEmail(String email) {
         return userRepository.findWithRegionByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
