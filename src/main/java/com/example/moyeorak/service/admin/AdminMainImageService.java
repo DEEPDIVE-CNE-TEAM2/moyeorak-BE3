@@ -149,7 +149,7 @@ public class AdminMainImageService {
         String safeFilename = sanitizeFilename(filename);
         String key = "main-images/" + admin.getRegion().getId() + "/" + safeFilename;
 
-        // 👇 Content-Type을 설정하지 않습니다 → SignedHeaders에서 제외됨(host만 남음)
+        // We intentionally do not set Content-Type so it is excluded from the signed headers (only 'host' remains).
         PutObjectRequest putObject = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
