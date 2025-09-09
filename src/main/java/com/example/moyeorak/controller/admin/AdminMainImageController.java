@@ -75,10 +75,10 @@ public class AdminMainImageController {
             HttpServletRequest httpRequest
     ) {
         String filename = body.filename();
-        String contentType = body.contentType();
+        String contentType = body.contentType(); // optional
 
-        if (isBlank(filename) || isBlank(contentType)) {
-            return ResponseEntity.badRequest().body("filename과 contentType는 비어 있을 수 없습니다.");
+        if (isBlank(filename)) {
+            return ResponseEntity.badRequest().body("filename은 비어 있을 수 없습니다.");
         }
 
         String url = adminMainImageService.createPresignedPutUrl(filename, contentType, httpRequest);
@@ -90,7 +90,7 @@ public class AdminMainImageController {
     // - 기존 클라이언트가 보내는 filetype도 지원
     // - contentType이 있으면 contentType 우선
     // -------------------------------
-    @Operation(summary = "S3 업로드용 Presigned URL 발급 (호환: GET + query, contentType/filetype 지원)")
+    @Operation(summary = "S3 업로드용 Presigned URL 발급 (호환: GET + query, contentType/filetype 선택)")
     @GetMapping("/presigned-url")
     public ResponseEntity<String> getPresignedUrl(
             @RequestParam String filename,
@@ -102,9 +102,6 @@ public class AdminMainImageController {
 
         if (isBlank(filename)) {
             return ResponseEntity.badRequest().body("필수 파라미터 누락: filename");
-        }
-        if (isBlank(ct)) {
-            return ResponseEntity.badRequest().body("필수 파라미터 누락: contentType (alias: filetype)");
         }
 
         String url = adminMainImageService.createPresignedPutUrl(filename, ct, httpRequest);
@@ -120,10 +117,10 @@ public class AdminMainImageController {
 
     /**
      * POST /presigned-url 요청용 DTO
-     * contentType에는 MIME 전체값을 넣어야 합니다. 예: image/jpeg, image/png, image/webp
+     * contentType은 선택값입니다. (서명에는 사용하지 않음)
      */
     public record PresignUrlRequest(
             @NotBlank String filename,
-            @NotBlank String contentType
+            String contentType
     ) {}
 }

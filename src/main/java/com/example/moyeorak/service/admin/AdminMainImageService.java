@@ -36,7 +36,7 @@ public class AdminMainImageService {
     @Value("${app.s3.bucket:}")
     private String bucketName;
 
-    /** 허용할 이미지 Content-Type 화이트리스트 */
+    /** 허용할 이미지 Content-Type 화이트리스트 (선택 입력 시 검증용) */
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "image/jpeg",
             "image/png",
@@ -127,9 +127,11 @@ public class AdminMainImageService {
         mainImageRepository.delete(image);
     }
 
-    /* ============== S3 Presigned PUT URL (권장 시그니처: contentType) ============== */
+    /* ============== S3 Presigned PUT URL (Content-Type은 서명에서 제외) ============== */
     @Transactional(readOnly = true)
-    public String createPresignedPutUrl(String filename, String contentType, HttpServletRequest request) {
+    public String createPresignedPutUrl(String filename,
+                                        String contentType, // optional: 검증/로그용, 서명에는 반영하지 않음
+                                        HttpServletRequest request) {
         User admin = adminAuthHelper.getAdminFromRequest(request);
         ensureRegionAccess(admin);
 
@@ -139,20 +141,18 @@ public class AdminMainImageService {
         if (isBlank(filename)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "filename is required.");
         }
-        if (isBlank(contentType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "contentType is required.");
-        }
-        if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
+        // contentType은 선택값: 있으면 화이트리스트 검증만 수행(서명에는 반영하지 않음)
+        if (!isBlank(contentType) && !ALLOWED_CONTENT_TYPES.contains(contentType)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported contentType: " + contentType);
         }
 
         String safeFilename = sanitizeFilename(filename);
         String key = "main-images/" + admin.getRegion().getId() + "/" + safeFilename;
 
+        // 👇 Content-Type을 설정하지 않습니다 → SignedHeaders에서 제외됨(host만 남음)
         PutObjectRequest putObject = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
-                .contentType(contentType)
                 .build();
 
         PutObjectPresignRequest presignReq = PutObjectPresignRequest.builder()

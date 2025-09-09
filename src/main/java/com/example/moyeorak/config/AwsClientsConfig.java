@@ -16,47 +16,49 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 @Configuration
 public class AwsClientsConfig {
 
-    // 다른 설정들과 통일: cloud.aws.region.static
+    /** AWS Region (application.yml의 cloud.aws.region.static 사용, 기본값: ap-northeast-2) */
     @Value("${cloud.aws.region.static:ap-northeast-2}")
     private String region;
 
-    // 로컬(프로파일) / 운영(IAM Role) 전환 플래그
+    /** 자격 증명 공급자 선택 플래그: true → DefaultCredentialsProvider (IAM Role/Env), false → ProfileCredentialsProvider */
     @Value("${aws.use.default-credentials:true}")
     private boolean useDefaultCredentials;
 
-    // 로컬에서 사용할 Shared Credentials 프로파일명
+    /** 로컬 개발 시 사용할 AWS profile 이름 (~/.aws/credentials) */
     @Value("${aws.profile.name:sqs-user}")
     private String profileName;
 
-    /** 공용 CredentialsProvider (S3/CloudWatch/SQS에서 재사용) */
+    /** 공용 CredentialsProvider (S3/CloudWatch/SQS 등 모든 클라이언트에서 재사용) */
     @Bean
     public AwsCredentialsProvider awsCredentialsProvider() {
         if (useDefaultCredentials) {
-            log.info("[AWS Creds] DefaultCredentialsProvider (IAM Role/Env)");
+            log.info("[AWS Creds] Using DefaultCredentialsProvider (IAM Role / Env vars)");
             return DefaultCredentialsProvider.create();
         } else {
-            log.info("[AWS Creds] ProfileCredentialsProvider profile={}", profileName);
+            log.info("[AWS Creds] Using ProfileCredentialsProvider profile={}", profileName);
             return ProfileCredentialsProvider.create(profileName);
         }
     }
 
+    /** CloudWatch Metrics Client */
     @Bean
     public CloudWatchClient cloudWatchClient(AwsCredentialsProvider creds) {
         CloudWatchClient client = CloudWatchClient.builder()
                 .region(Region.of(region))
                 .credentialsProvider(creds)
                 .build();
-        log.info("[CloudWatch] region={}", region);
+        log.info("[CloudWatch] initialized region={}", region);
         return client;
     }
 
+    /** CloudWatch Logs Client */
     @Bean
     public CloudWatchLogsClient cloudWatchLogsClient(AwsCredentialsProvider creds) {
         CloudWatchLogsClient client = CloudWatchLogsClient.builder()
                 .region(Region.of(region))
                 .credentialsProvider(creds)
                 .build();
-        log.info("[CloudWatchLogs] region={}", region);
+        log.info("[CloudWatchLogs] initialized region={}", region);
         return client;
     }
 
@@ -67,7 +69,7 @@ public class AwsClientsConfig {
                 .region(Region.of(region))
                 .credentialsProvider(creds)
                 .build();
-        log.info("[S3Presigner] region={}", region);
+        log.info("[S3Presigner] initialized region={}", region);
         return presigner;
     }
 }
