@@ -58,7 +58,7 @@ public class SecurityConfig {
 
                         // --- CloudWatch 프록시: 기본은 인증 필요 ---
                         .requestMatchers("/api/cloudwatch/**").authenticated()
-                        // 만약 공개로 열고 싶으면 위 줄을 주석 처리하고 아래 줄 사용
+                        // 공개로 열려면 위 줄 주석 처리하고 아래 줄 사용
                         // .requestMatchers("/api/cloudwatch/**").permitAll()
 
                         // --- 관리자 ---
@@ -73,7 +73,7 @@ public class SecurityConfig {
                             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다.");
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            // 권한 없음 → 403 (기존 401 잘못 반환하던 것 수정)
+                            // 권한 없음 → 403
                             response.sendError(HttpServletResponse.SC_FORBIDDEN, "접근 권한이 없습니다.");
                         })
                 )
@@ -85,7 +85,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // 정확한 오리진만 허용 (와일드카드 X)
+
+        // 정확한 오리진 명시 (크리덴셜 사용 시 * 불가)
         config.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://localhost:8080",
@@ -96,14 +97,32 @@ public class SecurityConfig {
                 "https://moyeorak.cloud",
                 "https://api.moyeorak.cloud"
         ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of(
-                "Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"
+
+        // 필요 시 하위 도메인 패턴 허용 (예: https://*.moyeorak.cloud)
+        // setAllowedOrigins와 병행 사용 가능. 크리덴셜(true)에서도 패턴 허용됨.
+        config.setAllowedOriginPatterns(List.of(
+                "https://*.moyeorak.cloud"
         ));
-        // 프론트에서 파일/이미지/다운로드 처리 시 필요할 수 있는 헤더 노출
-        config.setExposedHeaders(List.of("Content-Disposition", "Location"));
+
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+
+        // 프리사인드 업로드/다운로드 등 다양한 헤더 허용을 위해 * 권장 (x-amz-*, Content-Disposition 등 포함)
+        config.setAllowedHeaders(List.of("*"));
+
+        // 프론트에서 필요한 응답 헤더 노출
+        config.setExposedHeaders(List.of(
+                "Content-Disposition",
+                "Location",
+                "ETag",
+                "x-amz-request-id",
+                "x-amz-version-id"
+        ));
+
+        // 쿠키/인증 포함 요청 허용 (오리진 * 불가, 위에서 명시/패턴 사용)
         config.setAllowCredentials(true);
-        config.setMaxAge(3600L); // 1시간 preflight 캐시
+
+        // 프리플라이트 캐시
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
