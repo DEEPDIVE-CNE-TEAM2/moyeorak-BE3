@@ -39,7 +39,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // ❶ Preflight(OPTIONS)는 즉시 통과
+        // ❶ Immediately allow Preflight (OPTIONS) requests.
+        //    (프리플라이트 OPTIONS 요청은 필터에서 즉시 통과시킵니다)
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
@@ -52,7 +53,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (token != null && jwtProvider.validateToken(token)) {
                 String email = jwtProvider.getEmail(token);
                 if (email == null) {
-                    // sub 사용 케이스
+                    // Fallback: use subject if email claim is missing
                     email = jwtProvider.getSubject(token);
                 }
 
@@ -69,10 +70,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     userId = UNKNOWN_USER_ID;
                 }
 
-                // Optional: user 로드(없으면 null)
+                // Optional: load user entity to enrich principal (nullable)
                 var user = (email != null) ? userRepository.findByEmail(email).orElse(null) : null;
 
-                var principal = (user != null) ? user : email; // fallback: email 문자열
+                var principal = (user != null) ? user : email; // fallback to email string
                 var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
@@ -82,11 +83,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                             userId, email, authorities);
                 }
             } else {
-                if (token != null) {
-                    log.warn("JWT validation failed or token is null/invalid");
+                // Validation failed OR token was not provided/resolved
+                if (token == null) {
+                    log.warn("No Bearer token provided or non-Bearer Authorization header.");
+                } else {
+                    log.warn("JWT validation failed for provided token.");
                 }
                 if (devBypass && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    bypassAsTempUser(request, "Validation failed (dev bypass)");
+                    bypassAsTempUser(request, "Validation failed or no token (dev bypass)");
                 }
             }
         } catch (ExpiredJwtException e) {
@@ -103,7 +107,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         }
 
-        // 무토큰/비정상 포맷 + devBypass인 경우
+        // No token / non-Bearer + devBypass enabled → authenticate as temp user
         if (token == null && devBypass && SecurityContextHolder.getContext().getAuthentication() == null) {
             bypassAsTempUser(request, "No header/non-Bearer (dev bypass)");
         }
