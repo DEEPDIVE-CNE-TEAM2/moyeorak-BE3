@@ -106,8 +106,29 @@ public class SecurityConfig {
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // 프리사인드 업로드/다운로드 등 다양한 헤더 허용을 위해 * 권장 (x-amz-*, Content-Disposition 등 포함)
-        config.setAllowedHeaders(List.of("*"));
+        // S3 presigned upload/download 등 필요한 헤더만 명시적으로 허용 (x-amz-*, Content-Disposition 등 포함)
+        config.setAllowedHeaders(List.of(
+                "Content-Type",
+                "Authorization",
+                "Content-Disposition",
+                "Content-Length",
+                "ETag",
+                "x-amz-acl",
+                "x-amz-meta-*",
+                "x-amz-content-sha256",
+                "x-amz-date",
+                "x-amz-security-token",
+                "x-amz-user-agent",
+                "x-amz-request-id",
+                "x-amz-version-id",
+                "x-amz-storage-class",
+                "x-amz-server-side-encryption",
+                "x-amz-server-side-encryption-aws-kms-key-id",
+                "x-amz-server-side-encryption-context",
+                "x-amz-server-side-encryption-customer-algorithm",
+                "x-amz-server-side-encryption-customer-key",
+                "x-amz-server-side-encryption-customer-key-MD5"
+        ));
 
         // 프론트에서 필요한 응답 헤더 노출
         config.setExposedHeaders(List.of(
