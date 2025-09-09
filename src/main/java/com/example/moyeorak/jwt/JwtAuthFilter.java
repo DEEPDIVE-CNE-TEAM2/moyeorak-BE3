@@ -39,6 +39,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // ❶ Immediately allow Preflight (OPTIONS) requests.
+        //    (프리플라이트 OPTIONS 요청은 필터에서 즉시 통과시킵니다)
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String token = null;
         try {
             token = jwtProvider.resolveToken(request);
@@ -46,7 +53,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (token != null && jwtProvider.validateToken(token)) {
                 String email = jwtProvider.getEmail(token);
                 if (email == null) {
-                    // Handle case where sub is used as email
+                    // Fallback: use subject if email claim is missing
                     email = jwtProvider.getSubject(token);
                 }
 
@@ -60,10 +67,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 Long userId = jwtProvider.getUserId(token);
                 if (userId == null) {
-                    userId = UNKNOWN_USER_ID; // explicit placeholder
+                    userId = UNKNOWN_USER_ID;
                 }
 
-                // Optional: load user to enrich context (safe to be null)
+                // Optional: load user entity to enrich principal (nullable)
                 var user = (email != null) ? userRepository.findByEmail(email).orElse(null) : null;
 
                 var principal = (user != null) ? user : email; // fallback to email string
@@ -71,27 +78,37 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
 
-                log.debug("✅ JWT authentication successful - userId: {}, email: {}, roles: {}",
-                        userId, email, authorities);
+                if (log.isDebugEnabled()) {
+                    log.debug("✅ JWT authentication successful - userId: {}, email: {}, roles: {}",
+                            userId, email, authorities);
+                }
             } else {
-                if (devBypass) {
-                    bypassAsTempUser(request, "Validation failed (dev bypass)");
+                // Validation failed OR token was not provided/resolved
+                if (token == null) {
+                    log.warn("No Bearer token provided or non-Bearer Authorization header.");
+                } else {
+                    log.warn("JWT validation failed for provided token.");
+                }
+                if (devBypass && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    bypassAsTempUser(request, "Validation failed or no token (dev bypass)");
                 }
             }
         } catch (ExpiredJwtException e) {
-            log.debug("JWT expired: {}", e.getMessage());
+            log.warn("JWT expired: sub={}, exp={}",
+                    e.getClaims() != null ? e.getClaims().getSubject() : null,
+                    e.getClaims() != null ? e.getClaims().getExpiration() : null);
             if (devBypass) {
                 bypassAsTempUser(request, "Expired (dev bypass)");
             }
         } catch (Exception e) {
-            log.debug("JWT parse/validation error: {}", e.getMessage());
+            log.warn("JWT validation error: {}", e.getMessage());
             if (devBypass) {
                 bypassAsTempUser(request, "Signature/format error (dev bypass)");
             }
         }
 
+        // No token / non-Bearer + devBypass enabled → authenticate as temp user
         if (token == null && devBypass && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // No header/non-Bearer etc.
             bypassAsTempUser(request, "No header/non-Bearer (dev bypass)");
         }
 

@@ -1,10 +1,6 @@
 package com.example.moyeorak.jwt;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
@@ -24,29 +20,29 @@ import java.util.Objects;
 public class JwtProvider {
 
     @Value("${jwt.secret}")
-    private String secret; // HS256용 비밀키 (Base64 권장, 32바이트 이상)
+    private String secret; // HS256 secret (Base64 recommended, >=32 bytes)
 
     @Value("${jwt.issuer:}")
-    private String issuer; // 선택값
+    private String issuer; // optional
 
-    @Value("${jwt.access-token.ttl-seconds:1800}")   // 기본 30분
+    @Value("${jwt.access-token.ttl-seconds:1800}")   // default 30m
     private long accessTokenTtlSeconds;
 
-    @Value("${jwt.refresh-token.ttl-seconds:1209600}") // 기본 14일 = 60*60*24*14
+    @Value("${jwt.refresh-token.ttl-seconds:1209600}") // default 14d
     private long refreshTokenTtlSeconds;
 
     private Key key;
 
     @PostConstruct
     void init() {
-        // Base64로 우선 시도, 실패하면 raw bytes 사용
+        // Try Base64 first; if fails, fall back to raw bytes
         try {
             byte[] decoded = Decoders.BASE64.decode(secret);
             this.key = Keys.hmacShaKeyFor(decoded);
         } catch (Exception e) {
             byte[] raw = secret.getBytes(StandardCharsets.UTF_8);
             if (raw.length < 32) {
-                log.warn("jwt.secret 길이가 짧습니다(>=32 bytes 권장). 현재: {} bytes", raw.length);
+                log.warn("jwt.secret is short (>=32 bytes recommended). current: {} bytes", raw.length);
             }
             this.key = Keys.hmacShaKeyFor(raw);
         }
@@ -54,14 +50,14 @@ public class JwtProvider {
 
     /* ====== Token Generation ====== */
 
-    /** Access Token 생성 (subject=email, roles=role 문자열) */
+    /** Access Token (subject=email, roles=role string) */
     public String generateToken(String email, String role) {
         long now = System.currentTimeMillis();
         long expMillis = now + (accessTokenTtlSeconds * 1000L);
 
         var builder = Jwts.builder()
                 .setSubject(email)
-                .claim("roles", role)              // 프론트/기존 토큰과 호환(roles: "ADMIN")
+                .claim("roles", role)              // e.g., "ADMIN"
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(expMillis));
 
@@ -69,11 +65,10 @@ public class JwtProvider {
             builder.setIssuer(issuer);
         }
 
-        // HS256 서명
         return builder.signWith(key, SignatureAlgorithm.HS256).compact();
     }
 
-    /** Refresh Token 생성 (subject=email, 권한 등 부가클레임 없이 긴 만료) */
+    /** Refresh Token (subject=email, no extra claims, long expiry) */
     public String generateRefreshToken(String email) {
         long now = System.currentTimeMillis();
         long expMillis = now + (refreshTokenTtlSeconds * 1000L);
@@ -92,10 +87,10 @@ public class JwtProvider {
 
     /* ====== Public API ====== */
 
-    /** 토큰 유효성 검증(서명/만료 등) */
+    /** Validate token (signature/exp/etc.) */
     public boolean validateToken(String token) {
         try {
-            parseClaims(token); // 파싱되면 유효
+            parseClaims(token); // parsing succeeds => valid
             return true;
         } catch (ExpiredJwtException e) {
             log.debug("JWT expired: {}", e.getMessage());
@@ -106,7 +101,7 @@ public class JwtProvider {
         }
     }
 
-    /** userId 클레임(숫자) 또는 subject가 숫자면 반환 */
+    /** userId claim as Long (supports id/userId/uid or numeric sub) */
     public Long getUserId(String token) {
         try {
             Claims c = parseClaims(token);
@@ -119,7 +114,6 @@ public class JwtProvider {
             id = claimAsLong(c, "uid");
             if (id != null) return id;
 
-            // sub가 숫자면 그것도 허용
             String sub = c.getSubject();
             if (sub != null) {
                 try { return Long.parseLong(sub); } catch (NumberFormatException ignored) {}
@@ -130,7 +124,7 @@ public class JwtProvider {
         }
     }
 
-    /** email 클레임 또는 subject(이메일 형태면) */
+    /** email claim or subject (if looks like email) */
     public String getEmail(String token) {
         try {
             Claims c = parseClaims(token);
@@ -146,7 +140,7 @@ public class JwtProvider {
         }
     }
 
-    /** subject 그대로 반환 */
+    /** Return subject as-is */
     public String getSubject(String token) {
         try {
             return parseClaims(token).getSubject();
@@ -155,21 +149,20 @@ public class JwtProvider {
         }
     }
 
-    /** 단일 role 또는 roles 첫 번째 값(문자열/리스트/배열 모두 지원) */
+    /** Single role or first of roles (supports string/list/array) */
     public String getRole(String token) {
         try {
             Claims c = parseClaims(token);
 
-            // 1) role(단수)
+            // 1) role (singular)
             String role = claimAsString(c, "role");
             if (role != null) return role;
 
-            // 2) roles(복수)
+            // 2) roles (plural)
             Object roles = c.get("roles");
             if (roles == null) return null;
 
             if (roles instanceof String s) {
-                // "ADMIN" 또는 "ADMIN,USER"
                 String first = s.split(",")[0].trim();
                 return first.isEmpty() ? null : first;
             }
@@ -188,7 +181,7 @@ public class JwtProvider {
         }
     }
 
-    /** (선택) regionId 클레임을 쓰고 싶다면 사용 */
+    /** (optional) regionId claim */
     public Long getRegionId(String token) {
         try {
             Claims c = parseClaims(token);
@@ -198,7 +191,7 @@ public class JwtProvider {
         }
     }
 
-    /** Authorization: Bearer ... 헤더에서 토큰만 추출 */
+    /** Extract Bearer token from Authorization header */
     public String resolveToken(HttpServletRequest req) {
         String h = req.getHeader("Authorization");
         if (h == null) return null;
@@ -212,21 +205,26 @@ public class JwtProvider {
     /* ====== Internal ====== */
 
     private Claims parseClaims(String token) {
-        var parser = Jwts.parserBuilder().setSigningKey(key).build();
-        var jws = parser.parseClaimsJws(token);
+        // ❷ Allow clock skew (±300s) for robust exp/nbf validation
+        //    (서버/클라이언트 시간 오차 허용을 위해 ±300초 허용)
+        JwtParser parser = Jwts.parserBuilder()
+                .setSigningKey(key)
+                .setAllowedClockSkewSeconds(300)
+                .build();
+
+        Jws<Claims> jws = parser.parseClaimsJws(token);
         Claims c = jws.getBody();
 
-        // issuer가 설정되어 있으면 검사(선택)
+        // If issuer is configured, enforce exact match (optional)
+        // (issuer가 설정되어 있으면 정확히 일치하는지 검사)
         if (issuer != null && !issuer.isBlank()) {
             if (!Objects.equals(issuer, c.getIssuer())) {
                 throw new JwtException("Invalid issuer");
             }
         }
-        // 만료는 JJWT가 ExpiredJwtException으로 이미 처리
-        Date exp = c.getExpiration();
-        if (exp != null && exp.before(new Date())) {
-            throw new ExpiredJwtException(jws.getHeader(), c, "Expired");
-        }
+
+        // Expiration is already validated by JJWT; no manual re-check necessary.
+        // (만료(exp) 검증은 JJWT가 이미 수행하므로 수동 재검사가 필요 없습니다)
         return c;
     }
 
