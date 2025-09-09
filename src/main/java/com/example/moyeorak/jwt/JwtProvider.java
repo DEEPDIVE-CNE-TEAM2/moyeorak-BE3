@@ -1,10 +1,6 @@
 package com.example.moyeorak.jwt;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
@@ -32,7 +28,7 @@ public class JwtProvider {
     @Value("${jwt.access-token.ttl-seconds:1800}")   // 기본 30분
     private long accessTokenTtlSeconds;
 
-    @Value("${jwt.refresh-token.ttl-seconds:1209600}") // 기본 14일 = 60*60*24*14
+    @Value("${jwt.refresh-token.ttl-seconds:1209600}") // 기본 14일
     private long refreshTokenTtlSeconds;
 
     private Key key;
@@ -61,7 +57,7 @@ public class JwtProvider {
 
         var builder = Jwts.builder()
                 .setSubject(email)
-                .claim("roles", role)              // 프론트/기존 토큰과 호환(roles: "ADMIN")
+                .claim("roles", role)              // (예) "ADMIN"
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(expMillis));
 
@@ -69,7 +65,6 @@ public class JwtProvider {
             builder.setIssuer(issuer);
         }
 
-        // HS256 서명
         return builder.signWith(key, SignatureAlgorithm.HS256).compact();
     }
 
@@ -119,7 +114,7 @@ public class JwtProvider {
             id = claimAsLong(c, "uid");
             if (id != null) return id;
 
-            // sub가 숫자면 그것도 허용
+            // sub가 숫자면 허용
             String sub = c.getSubject();
             if (sub != null) {
                 try { return Long.parseLong(sub); } catch (NumberFormatException ignored) {}
@@ -188,7 +183,7 @@ public class JwtProvider {
         }
     }
 
-    /** (선택) regionId 클레임을 쓰고 싶다면 사용 */
+    /** (선택) regionId 클레임 */
     public Long getRegionId(String token) {
         try {
             Claims c = parseClaims(token);
@@ -212,8 +207,13 @@ public class JwtProvider {
     /* ====== Internal ====== */
 
     private Claims parseClaims(String token) {
-        var parser = Jwts.parserBuilder().setSigningKey(key).build();
-        var jws = parser.parseClaimsJws(token);
+        // ❷ Clock skew 허용(±300초)
+        JwtParser parser = Jwts.parserBuilder()
+                .setSigningKey(key)
+                .setAllowedClockSkewSeconds(300)
+                .build();
+
+        Jws<Claims> jws = parser.parseClaimsJws(token);
         Claims c = jws.getBody();
 
         // issuer가 설정되어 있으면 검사(선택)
@@ -222,11 +222,7 @@ public class JwtProvider {
                 throw new JwtException("Invalid issuer");
             }
         }
-        // 만료는 JJWT가 ExpiredJwtException으로 이미 처리
-        Date exp = c.getExpiration();
-        if (exp != null && exp.before(new Date())) {
-            throw new ExpiredJwtException(jws.getHeader(), c, "Expired");
-        }
+        // 만료(exp) 체크는 JJWT가 이미 처리하므로 수동 재검사 불필요
         return c;
     }
 

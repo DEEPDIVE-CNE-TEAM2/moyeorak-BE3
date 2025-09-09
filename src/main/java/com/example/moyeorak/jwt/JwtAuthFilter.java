@@ -39,6 +39,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // ❶ Preflight(OPTIONS)는 즉시 통과
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String token = null;
         try {
             token = jwtProvider.resolveToken(request);
@@ -46,7 +52,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (token != null && jwtProvider.validateToken(token)) {
                 String email = jwtProvider.getEmail(token);
                 if (email == null) {
-                    // Handle case where sub is used as email
+                    // sub 사용 케이스
                     email = jwtProvider.getSubject(token);
                 }
 
@@ -60,38 +66,45 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 Long userId = jwtProvider.getUserId(token);
                 if (userId == null) {
-                    userId = UNKNOWN_USER_ID; // explicit placeholder
+                    userId = UNKNOWN_USER_ID;
                 }
 
-                // Optional: load user to enrich context (safe to be null)
+                // Optional: user 로드(없으면 null)
                 var user = (email != null) ? userRepository.findByEmail(email).orElse(null) : null;
 
-                var principal = (user != null) ? user : email; // fallback to email string
+                var principal = (user != null) ? user : email; // fallback: email 문자열
                 var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
 
-                log.debug("✅ JWT authentication successful - userId: {}, email: {}, roles: {}",
-                        userId, email, authorities);
+                if (log.isDebugEnabled()) {
+                    log.debug("✅ JWT authentication successful - userId: {}, email: {}, roles: {}",
+                            userId, email, authorities);
+                }
             } else {
-                if (devBypass) {
+                if (token != null) {
+                    log.warn("JWT validation failed or token is null/invalid");
+                }
+                if (devBypass && SecurityContextHolder.getContext().getAuthentication() == null) {
                     bypassAsTempUser(request, "Validation failed (dev bypass)");
                 }
             }
         } catch (ExpiredJwtException e) {
-            log.debug("JWT expired: {}", e.getMessage());
+            log.warn("JWT expired: sub={}, exp={}",
+                    e.getClaims() != null ? e.getClaims().getSubject() : null,
+                    e.getClaims() != null ? e.getClaims().getExpiration() : null);
             if (devBypass) {
                 bypassAsTempUser(request, "Expired (dev bypass)");
             }
         } catch (Exception e) {
-            log.debug("JWT parse/validation error: {}", e.getMessage());
+            log.warn("JWT validation error: {}", e.getMessage());
             if (devBypass) {
                 bypassAsTempUser(request, "Signature/format error (dev bypass)");
             }
         }
 
+        // 무토큰/비정상 포맷 + devBypass인 경우
         if (token == null && devBypass && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // No header/non-Bearer etc.
             bypassAsTempUser(request, "No header/non-Bearer (dev bypass)");
         }
 
